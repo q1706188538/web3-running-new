@@ -180,7 +180,7 @@ const WalletManager = {
         // 添加点击事件 - 在当前标签页跳转
         freeTrialBtn.addEventListener('click', function() {
             console.log('跳转到免费体验版本');
-            window.location.href = 'https://q1706188538.github.io/taowang/';
+            window.location.href = 'http://taowwww.blakcat.top/';
         });
 
         // 组装UI - 添加断开连接按钮、兑换代币按钮和免费体验按钮
@@ -251,7 +251,7 @@ const WalletManager = {
         // 添加点击事件 - 在当前标签页跳转
         freeTrialButton.onclick = function() {
             console.log('从登录屏幕跳转到免费体验版本');
-            window.location.href = 'https://q1706188538.github.io/taowang/';
+            window.location.href = 'http://taowwww.blakcat.top/';
         };
 
         // 组装登录屏幕
