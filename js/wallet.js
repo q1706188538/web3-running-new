@@ -113,6 +113,7 @@ const WalletManager = {
         // 创建MetaMask图标
         const metamaskIcon = document.createElement('div');
         metamaskIcon.style.cssText = 'width: 100px; height: 100px; background-image: url(https://metamask.io/images/metamask-fox.svg); background-size: contain; background-repeat: no-repeat; background-position: center; margin-bottom: 30px;';
+        metamaskIcon.title = 'MetaMask钱包';
 
         // 创建连接按钮
         const connectButton = document.createElement('button');
@@ -135,8 +136,8 @@ const WalletManager = {
 
         // 组装登录屏幕
         loginScreen.appendChild(title);
-        loginScreen.appendChild(metamaskIcon);
         loginScreen.appendChild(description);
+        loginScreen.appendChild(metamaskIcon);
         loginScreen.appendChild(connectButton);
         loginScreen.appendChild(hint);
 
@@ -184,11 +185,17 @@ const WalletManager = {
             }
         }
 
-        // 检查是否安装了MetaMask
-        if (typeof window.ethereum !== 'undefined') {
+        // 检查可用的钱包提供商
+        const provider = this.getWalletProvider();
+
+        if (provider) {
             try {
+                // 初始化Web3
+                this.web3 = new Web3(provider);
+                console.log('Web3初始化成功，使用提供商:', provider === window.ethereum ? 'window.ethereum' : '其他提供商');
+
                 // 获取已连接的账户
-                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                const accounts = await provider.request({ method: 'eth_accounts' });
 
                 if (accounts.length > 0 && !this.manuallyDisconnected) {
                     // 只有在用户没有主动断开连接的情况下，才自动恢复连接
@@ -202,9 +209,9 @@ const WalletManager = {
                 }
 
                 // 监听账户变化
-                window.ethereum.on('accountsChanged', this.handleAccountsChanged.bind(this));
+                provider.on('accountsChanged', this.handleAccountsChanged.bind(this));
                 // 监听链变化
-                window.ethereum.on('chainChanged', this.handleChainChanged.bind(this));
+                provider.on('chainChanged', this.handleChainChanged.bind(this));
             } catch (error) {
                 console.error('检查连接时出错:', error);
 
@@ -217,9 +224,9 @@ const WalletManager = {
                 }
             }
         } else {
-            console.log('未检测到MetaMask');
+            console.log('未检测到任何钱包插件');
 
-            // 未检测到MetaMask，如果需要强制登录，显示登录屏幕
+            // 未检测到钱包插件，如果需要强制登录，显示登录屏幕
             if (this.loginRequired) {
                 const loginScreen = document.getElementById('wallet-login-screen');
                 if (loginScreen) {
@@ -229,72 +236,131 @@ const WalletManager = {
         }
     },
 
-    // 连接钱包
-    connectWallet: async function() {
-        console.log('尝试连接钱包...');
+    // 获取钱包提供商 - 只检测MetaMask
+    getWalletProvider: function() {
+        console.log('检测MetaMask钱包提供商...');
 
-        if (typeof window.ethereum !== 'undefined') {
+        // 检查是否有ethereum提供商
+        if (window.ethereum) {
+            // 检查是否是MetaMask
+            if (window.ethereum.isMetaMask) {
+                console.log('检测到 MetaMask 钱包');
+                return window.ethereum;
+            }
+
+            // 如果没有MetaMask标识，但存在ethereum对象，检查是否可能是MetaMask
+            try {
+                // 尝试获取提供商名称
+                const providerName = window.ethereum.constructor.name || '';
+                if (providerName.toLowerCase().includes('metamask')) {
+                    console.log('检测到可能是 MetaMask 的提供商:', providerName);
+                    return window.ethereum;
+                }
+            } catch (e) {
+                console.log('检查提供商名称时出错:', e);
+            }
+
+            console.log('ethereum对象存在，但不是MetaMask，尝试使用它');
+            return window.ethereum;
+        }
+
+        // 检查旧版MetaMask
+        if (window.web3 && window.web3.currentProvider && window.web3.currentProvider.isMetaMask) {
+            console.log('检测到旧版 MetaMask 提供商');
+            return window.web3.currentProvider;
+        }
+
+        console.log('未检测到 MetaMask 钱包提供商');
+        return null;
+    },
+
+    // 连接钱包 - 只连接MetaMask
+    connectWallet: async function() {
+        console.log('尝试连接MetaMask钱包...');
+
+        // 获取MetaMask提供商
+        const provider = this.getWalletProvider();
+
+        if (provider) {
             try {
                 // 初始化Web3
-                this.web3 = new Web3(window.ethereum);
+                this.web3 = new Web3(provider);
+                console.log('Web3初始化成功');
 
                 // 清除断开连接标志
                 this.manuallyDisconnected = false;
                 localStorage.removeItem('wallet_manually_disconnected');
-
                 console.log('已清除断开连接标志');
 
-                // 强制断开当前连接，确保MetaMask显示选择界面
-                console.log('尝试强制断开当前连接...');
-
+                // 尝试获取当前账户
                 try {
-                    // 先尝试获取当前账户，不会弹出MetaMask
-                    const currentAccounts = await window.ethereum.request({ method: 'eth_accounts' });
+                    const currentAccounts = await provider.request({ method: 'eth_accounts' });
                     console.log('当前已连接账户:', currentAccounts);
-
-                    // 如果有已连接账户，尝试断开
-                    if (currentAccounts && currentAccounts.length > 0) {
-                        // 注意：MetaMask不支持直接断开连接的API，我们通过其他方式强制刷新
-                        console.log('检测到已连接账户，尝试强制刷新连接...');
-                    }
                 } catch (e) {
                     console.log('检查当前账户时出错:', e);
                 }
 
-                // 使用强制参数请求连接账户
-                console.log('请求连接账户，强制显示MetaMask...');
+                // 请求连接账户
+                console.log('请求连接MetaMask账户...');
+                let accounts = [];
 
-                // 使用wallet_requestPermissions API强制显示MetaMask
-                try {
-                    // 这个API会强制显示MetaMask，即使已经连接
-                    await window.ethereum.request({
-                        method: 'wallet_requestPermissions',
-                        params: [{ eth_accounts: {} }]
-                    });
-                    console.log('成功请求权限，现在获取账户...');
-                } catch (permError) {
-                    console.log('请求权限失败，可能被用户拒绝:', permError);
-                    // 如果用户拒绝了权限请求，我们不继续
-                    if (permError.code === 4001) { // 用户拒绝
-                        throw permError;
+                // 尝试使用wallet_requestPermissions API强制显示MetaMask
+                if (provider.isMetaMask) {
+                    try {
+                        await provider.request({
+                            method: 'wallet_requestPermissions',
+                            params: [{ eth_accounts: {} }]
+                        });
+                        console.log('成功请求MetaMask权限');
+                    } catch (permError) {
+                        console.log('请求MetaMask权限失败:', permError);
+                        // 如果用户拒绝了权限请求，我们继续尝试eth_requestAccounts
                     }
                 }
 
-                // 获取账户
-                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                console.log('获取到账户:', accounts);
+                try {
+                    // 获取账户
+                    accounts = await provider.request({ method: 'eth_requestAccounts' });
+                    console.log('获取到MetaMask账户:', accounts);
+                } catch (accountsError) {
+                    console.error('获取MetaMask账户失败:', accountsError);
+
+                    // 如果是用户拒绝错误，直接抛出
+                    if (accountsError.code === 4001) { // 用户拒绝
+                        throw new Error('用户拒绝了连接请求');
+                    }
+
+                    // 尝试使用备用方法
+                    try {
+                        accounts = await provider.enable();
+                        console.log('使用备用方法获取到MetaMask账户:', accounts);
+                    } catch (enableError) {
+                        console.error('备用方法获取MetaMask账户也失败:', enableError);
+                        throw new Error('无法连接到MetaMask，请确保MetaMask已安装并解锁');
+                    }
+                }
 
                 // 获取链ID
-                this.chainId = await window.ethereum.request({ method: 'eth_chainId' });
-                console.log('已连接到链ID:', this.chainId);
+                try {
+                    this.chainId = await provider.request({ method: 'eth_chainId' });
+                    console.log('已连接到链ID:', this.chainId);
+                } catch (chainError) {
+                    console.error('获取链ID失败:', chainError);
+                    // 不阻止继续，使用默认链ID
+                    this.chainId = '0x1'; // 默认以太坊主网
+                }
 
                 // 处理账户变化（这会触发数据同步和登录成功事件）
-                await this.handleAccountsChanged(accounts);
+                if (accounts.length > 0) {
+                    await this.handleAccountsChanged(accounts);
+                } else {
+                    throw new Error('未能获取MetaMask账户');
+                }
 
                 // 确保游戏容器可见
                 const container = document.getElementById('container');
                 if (container && container.style.display === 'none') {
-                    console.log('重新连接后显示游戏容器');
+                    console.log('连接MetaMask后显示游戏容器');
                     container.style.display = 'block';
                 }
 
@@ -308,38 +374,56 @@ const WalletManager = {
                 return true;
             } catch (error) {
                 console.error('连接MetaMask失败:', error);
-                alert('连接MetaMask失败: ' + error.message);
+                alert('连接MetaMask失败: ' + (error.message || '未知错误'));
                 return false;
             }
         } else {
-            alert('请安装MetaMask钱包插件');
+            alert('未检测到MetaMask钱包插件，请安装MetaMask');
             window.open('https://metamask.io/download.html', '_blank');
             return false;
         }
     },
 
-    // 断开连接
+    // 断开连接 - 只针对MetaMask
     disconnectWallet: async function() {
-        console.log('断开钱包连接');
+        console.log('断开MetaMask钱包连接');
 
-        // 尝试使用MetaMask API断开连接（如果支持）
-        if (this.web3 && window.ethereum) {
+        // 获取MetaMask提供商
+        const provider = this.getWalletProvider();
+
+        // 尝试使用MetaMask API断开连接
+        if (this.web3 && provider) {
             try {
                 console.log('尝试使用MetaMask API断开连接...');
 
                 // 注意：MetaMask不支持直接断开连接的API，但我们可以尝试清除一些状态
 
                 // 移除所有事件监听器
-                if (typeof window.ethereum.removeAllListeners === 'function') {
-                    window.ethereum.removeAllListeners();
+                if (typeof provider.removeAllListeners === 'function') {
+                    provider.removeAllListeners();
                     console.log('已移除所有MetaMask事件监听器');
+                } else if (typeof provider.off === 'function') {
+                    // 尝试移除特定事件监听器
+                    try {
+                        provider.off('accountsChanged');
+                        provider.off('chainChanged');
+                        provider.off('connect');
+                        provider.off('disconnect');
+                        console.log('已移除特定MetaMask事件监听器');
+                    } catch (e) {
+                        console.log('移除特定事件监听器失败:', e);
+                    }
                 }
 
                 // 尝试获取当前账户，不会弹出MetaMask
-                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-                console.log('断开前的账户:', accounts);
+                try {
+                    const accounts = await provider.request({ method: 'eth_accounts' });
+                    console.log('断开前的MetaMask账户:', accounts);
+                } catch (e) {
+                    console.log('获取断开前MetaMask账户时出错:', e);
+                }
             } catch (error) {
-                console.log('尝试断开连接时出错:', error);
+                console.log('尝试断开MetaMask连接时出错:', error);
             }
         }
 
@@ -354,9 +438,11 @@ const WalletManager = {
         // 将断开连接状态保存到localStorage
         localStorage.setItem('wallet_manually_disconnected', 'true');
 
-        // 清除其他可能的缓存
+        // 清除MetaMask相关缓存
         localStorage.removeItem('metamask_connected');
         localStorage.removeItem('metamask_account');
+        localStorage.removeItem('wallet_connected');
+        localStorage.removeItem('wallet_account');
 
         console.log('已设置断开连接标志，刷新页面后不会自动重连');
 
