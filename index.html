@@ -132,8 +132,8 @@
 		window.addEventListener('DOMContentLoaded', function() {
 			console.log('页面加载完成，初始化组件...');
 
-			// 设置API服务基础URL
-			ApiService.setBaseUrl('http://localhost:3000/api');
+			// 设置API服务基础URL - 使用相对路径
+			ApiService.setBaseUrl('/api');
 
 			// 初始化钱包进度管理器
 			WalletProgress.init();
@@ -215,8 +215,8 @@
 									const userData = await ApiService.getUserData(walletAddress);
 									console.log('获取用户数据结果:', userData);
 
-									// 检查data目录
-									const checkDataDir = await fetch('http://localhost:3000/check-data-dir');
+									// 检查data目录 - 使用相对路径
+									const checkDataDir = await fetch('/check-data-dir');
 									console.log('检查data目录结果:', await checkDataDir.text());
 								} catch (e) {
 									console.error('检查用户数据时出错:', e);
