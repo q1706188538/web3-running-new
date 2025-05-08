@@ -402,6 +402,168 @@ app.post('/api/user/:walletAddress/coins', (req, res) => {
     }
 });
 
+/**
+ * 获取用户代币余额
+ * GET /api/user/:walletAddress/tokens
+ */
+app.get('/api/user/:walletAddress/tokens', (req, res) => {
+    const { walletAddress } = req.params;
+
+    // 验证钱包地址格式
+    if (!isValidWalletAddress(walletAddress)) {
+        return res.status(400).json({ error: '无效的钱包地址格式' });
+    }
+
+    const filePath = getUserDataPath(walletAddress);
+
+    try {
+        // 检查用户数据是否存在
+        if (!fs.existsSync(filePath)) {
+            return res.status(200).json({ tokens: 0 });
+        }
+
+        // 读取用户数据
+        const userData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+        // 返回代币余额
+        res.status(200).json({
+            tokens: userData.tokens || 0
+        });
+    } catch (error) {
+        console.error(`获取用户代币余额出错: ${error.message}`);
+        res.status(500).json({ error: '获取用户代币余额时出错' });
+    }
+});
+
+/**
+ * 兑换代币
+ * POST /api/user/:walletAddress/exchange-tokens
+ * 请求体: { tokenAmount: 数量, coinsPerToken: 兑换比例, feePercent: 手续费百分比 }
+ */
+app.post('/api/user/:walletAddress/exchange-tokens', (req, res) => {
+    const { walletAddress } = req.params;
+    const { tokenAmount, coinsPerToken = 1000, feePercent = 2 } = req.body;
+
+    // 验证钱包地址格式
+    if (!isValidWalletAddress(walletAddress)) {
+        return res.status(400).json({ error: '无效的钱包地址格式' });
+    }
+
+    // 验证代币数量
+    if (typeof tokenAmount !== 'number' || tokenAmount <= 0) {
+        return res.status(400).json({ error: '无效的代币数量' });
+    }
+
+    const filePath = getUserDataPath(walletAddress);
+
+    try {
+        // 读取现有用户数据
+        let userData = {};
+        if (fs.existsSync(filePath)) {
+            userData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        }
+
+        // 计算需要的金币数量
+        const requiredCoins = tokenAmount * coinsPerToken;
+
+        // 计算手续费
+        const feePercentage = feePercent / 100;
+        const feeAmount = Math.ceil(requiredCoins * feePercentage);
+        const totalCoinsNeeded = requiredCoins + feeAmount;
+
+        console.log(`兑换代币: ${tokenAmount} 个代币，需要 ${requiredCoins} 金币，手续费 ${feeAmount} 金币，总计 ${totalCoinsNeeded} 金币`);
+
+        // 检查金币是否足够
+        const currentCoins = userData.coins || 0;
+        if (currentCoins < totalCoinsNeeded) {
+            return res.status(400).json({
+                error: `金币不足，需要 ${totalCoinsNeeded} 金币，当前余额 ${currentCoins} 金币`,
+                required: totalCoinsNeeded,
+                current: currentCoins
+            });
+        }
+
+        // 扣除金币
+        userData.coins = currentCoins - totalCoinsNeeded;
+        console.log(`扣除金币: ${totalCoinsNeeded}，剩余金币: ${userData.coins}`);
+
+        // 增加代币
+        userData.tokens = (userData.tokens || 0) + tokenAmount;
+        console.log(`增加代币: ${tokenAmount}，当前代币余额: ${userData.tokens}`);
+
+        // 确保兑换历史记录存在
+        userData.exchangeHistory = userData.exchangeHistory || [];
+
+        // 添加兑换记录
+        const exchangeRecord = {
+            date: new Date().toISOString(),
+            tokenAmount: tokenAmount,
+            coinsAmount: requiredCoins,
+            feeAmount: feeAmount,
+            totalCoins: totalCoinsNeeded,
+            coinsPerToken: coinsPerToken,
+            feePercent: feePercent,
+            coinsBalanceAfter: userData.coins,
+            tokensBalanceAfter: userData.tokens
+        };
+
+        userData.exchangeHistory.push(exchangeRecord);
+        console.log(`添加兑换记录:`, exchangeRecord);
+
+        // 添加时间戳
+        userData.lastUpdated = new Date().toISOString();
+
+        // 保存更新后的数据
+        fs.writeFileSync(filePath, JSON.stringify(userData, null, 2));
+
+        res.status(200).json({
+            success: true,
+            tokens: userData.tokens,
+            coins: userData.coins,
+            exchanged: tokenAmount,
+            coinsUsed: totalCoinsNeeded,
+            feeAmount: feeAmount,
+            record: exchangeRecord
+        });
+    } catch (error) {
+        console.error(`兑换代币出错: ${error.message}`);
+        res.status(500).json({ error: '兑换代币时出错' });
+    }
+});
+
+/**
+ * 获取兑换历史
+ * GET /api/user/:walletAddress/exchange-history
+ */
+app.get('/api/user/:walletAddress/exchange-history', (req, res) => {
+    const { walletAddress } = req.params;
+
+    // 验证钱包地址格式
+    if (!isValidWalletAddress(walletAddress)) {
+        return res.status(400).json({ error: '无效的钱包地址格式' });
+    }
+
+    const filePath = getUserDataPath(walletAddress);
+
+    try {
+        // 检查用户数据是否存在
+        if (!fs.existsSync(filePath)) {
+            return res.status(200).json({ history: [] });
+        }
+
+        // 读取用户数据
+        const userData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+        // 返回兑换历史
+        res.status(200).json({
+            history: userData.exchangeHistory || []
+        });
+    } catch (error) {
+        console.error(`获取兑换历史出错: ${error.message}`);
+        res.status(500).json({ error: '获取兑换历史时出错' });
+    }
+});
+
 // 辅助函数：获取用户数据文件路径
 function getUserDataPath(walletAddress) {
     // 使用钱包地址的小写形式作为文件名

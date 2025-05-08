@@ -21,6 +21,24 @@ const GameConfig = {
     // API基础URL
     API_BASE_URL: '/api',
 
+    // 代币兑换相关配置
+    TOKEN_EXCHANGE: {
+        // 代币名称
+        TOKEN_NAME: "TRX",
+
+        // 兑换比例：多少游戏金币兑换1个代币
+        COINS_PER_TOKEN: 1000,
+
+        // 最小兑换数量（代币）
+        MIN_EXCHANGE_AMOUNT: 1,
+
+        // 最大兑换数量（代币）
+        MAX_EXCHANGE_AMOUNT: 1000,
+
+        // 兑换手续费（百分比）
+        EXCHANGE_FEE_PERCENT: 2
+    },
+
     // 初始化
     init: function() {
         console.log('初始化游戏配置...');

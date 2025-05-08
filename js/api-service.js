@@ -357,5 +357,144 @@ const ApiService = {
             console.error('错误详情:', error.message);
             return false;
         }
+    },
+
+    // 获取用户代币余额
+    getTokenBalance: async function(walletAddress) {
+        if (!walletAddress) {
+            console.error('获取用户代币余额失败: 钱包地址为空');
+            return 0;
+        }
+
+        try {
+            const response = await fetch(`${this.baseUrl}/user/${walletAddress}/tokens`);
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || '获取用户代币余额失败');
+            }
+
+            const data = await response.json();
+            console.log('获取用户代币余额成功:', data);
+            return data.tokens || 0;
+        } catch (error) {
+            console.error('获取用户代币余额出错:', error.message);
+            return 0;
+        }
+    },
+
+    // 兑换代币
+    exchangeTokens: async function(walletAddress, tokenAmount) {
+        if (!walletAddress) {
+            console.error('兑换代币失败: 钱包地址为空');
+            return { success: false, error: '钱包地址为空' };
+        }
+
+        if (!tokenAmount || tokenAmount <= 0) {
+            console.error('兑换代币失败: 代币数量无效');
+            return { success: false, error: '代币数量必须大于0' };
+        }
+
+        // 获取配置中的兑换比例
+        const exchangeConfig = typeof GameConfig !== 'undefined' ? GameConfig.TOKEN_EXCHANGE : {
+            COINS_PER_TOKEN: 1000,
+            MIN_EXCHANGE_AMOUNT: 1,
+            MAX_EXCHANGE_AMOUNT: 1000,
+            EXCHANGE_FEE_PERCENT: 2
+        };
+
+        // 检查兑换数量是否在允许范围内
+        if (tokenAmount < exchangeConfig.MIN_EXCHANGE_AMOUNT) {
+            return {
+                success: false,
+                error: `兑换数量不能小于${exchangeConfig.MIN_EXCHANGE_AMOUNT}个代币`
+            };
+        }
+
+        if (tokenAmount > exchangeConfig.MAX_EXCHANGE_AMOUNT) {
+            return {
+                success: false,
+                error: `兑换数量不能大于${exchangeConfig.MAX_EXCHANGE_AMOUNT}个代币`
+            };
+        }
+
+        // 计算需要的金币数量
+        const requiredCoins = tokenAmount * exchangeConfig.COINS_PER_TOKEN;
+
+        // 计算手续费
+        const feePercentage = exchangeConfig.EXCHANGE_FEE_PERCENT / 100;
+        const feeAmount = Math.ceil(requiredCoins * feePercentage);
+        const totalCoinsNeeded = requiredCoins + feeAmount;
+
+        console.log(`尝试兑换代币: ${tokenAmount} 个代币，需要 ${requiredCoins} 金币，手续费 ${feeAmount} 金币，总计 ${totalCoinsNeeded} 金币`);
+
+        try {
+            const url = `${this.baseUrl}/user/${walletAddress}/exchange-tokens`;
+            console.log('API请求URL:', url);
+            console.log('请求方法: POST');
+            console.log('请求体:', JSON.stringify({ tokenAmount }, null, 2));
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    tokenAmount,
+                    coinsPerToken: exchangeConfig.COINS_PER_TOKEN,
+                    feePercent: exchangeConfig.EXCHANGE_FEE_PERCENT
+                })
+            });
+
+            console.log('API响应状态:', response.status, response.statusText);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API响应错误:', errorText);
+                try {
+                    const errorData = JSON.parse(errorText);
+                    return { success: false, error: errorData.error || '兑换代币失败' };
+                } catch (e) {
+                    return { success: false, error: `兑换代币失败: ${response.status} ${response.statusText}` };
+                }
+            }
+
+            const result = await response.json();
+            console.log('兑换代币成功:', result);
+
+            return {
+                success: true,
+                data: result,
+                message: `成功兑换 ${tokenAmount} 个代币，消耗 ${totalCoinsNeeded} 金币（含手续费 ${feeAmount} 金币）`
+            };
+        } catch (error) {
+            console.error('兑换代币出错:', error);
+            console.error('错误详情:', error.message);
+            return { success: false, error: error.message || '兑换代币时发生错误' };
+        }
+    },
+
+    // 获取兑换历史
+    getExchangeHistory: async function(walletAddress) {
+        if (!walletAddress) {
+            console.error('获取兑换历史失败: 钱包地址为空');
+            return [];
+        }
+
+        try {
+            const response = await fetch(`${this.baseUrl}/user/${walletAddress}/exchange-history`);
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || '获取兑换历史失败');
+            }
+
+            const data = await response.json();
+            console.log('获取兑换历史成功:', data);
+            return data.history || [];
+        } catch (error) {
+            console.error('获取兑换历史出错:', error.message);
+            return [];
+        }
     }
 };

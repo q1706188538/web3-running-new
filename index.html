@@ -24,6 +24,7 @@
 		<script type="text/javascript" src="./js/game-status-panel.js"></script>
 		<script type="text/javascript" src="./js/debug-tools.js"></script>
 		<script type="text/javascript" src="./js/play-button-interceptor.js"></script>
+		<script type="text/javascript" src="./js/token-exchange.js"></script>
 
 		<!-- 配置补丁，禁用不必要的网络请求 -->
 		<script type="text/javascript" src="./js/config-patch.js"></script>
@@ -144,6 +145,9 @@
 
 			// 初始化游戏状态面板
 			GameStatusPanel.init();
+
+			// 初始化代币兑换模块
+			TokenExchange.init();
 
 			// 添加一个延迟检查，确保在所有组件初始化后检查金币数据
 			setTimeout(async function() {
