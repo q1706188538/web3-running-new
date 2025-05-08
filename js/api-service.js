@@ -3,8 +3,8 @@
  * 用于与后端服务器通信，保存和获取用户数据
  */
 const ApiService = {
-    // API基础URL
-    baseUrl: 'http://localhost:9001/api',
+    // API基础URL - 使用相对路径，自动适应当前域名
+    baseUrl: '/api',
 
     // 设置API基础URL
     setBaseUrl: function(url) {
@@ -296,7 +296,8 @@ const ApiService = {
     // 测试API连接
     testConnection: async function() {
         try {
-            const response = await fetch(`${this.baseUrl.replace('/api', '')}/health`);
+            // 使用相对路径访问health端点
+            const response = await fetch('/health');
 
             if (!response.ok) {
                 throw new Error('API连接测试失败');
@@ -321,7 +322,8 @@ const ApiService = {
         console.log('尝试创建新用户数据:', walletAddress);
 
         try {
-            const url = `${this.baseUrl.replace('/api', '')}/create-user-data/${walletAddress}`;
+            // 使用相对路径访问create-user-data端点
+            const url = `/create-user-data/${walletAddress}`;
             console.log('API请求URL:', url);
 
             const response = await fetch(url);
