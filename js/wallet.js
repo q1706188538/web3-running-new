@@ -159,9 +159,34 @@ const WalletManager = {
             }
         });
 
-        // 组装UI - 添加断开连接按钮和兑换代币按钮
+        // 创建免费体验按钮 - 放在兑换代币按钮下方
+        const freeTrialBtn = document.createElement('button');
+        freeTrialBtn.id = 'free-trial-btn';
+        freeTrialBtn.className = 'wallet-button';
+        freeTrialBtn.textContent = '免费体验';
+        freeTrialBtn.style.cssText = 'background-color: #3498db; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); transition: all 0.2s ease;';
+
+        // 添加悬停效果
+        freeTrialBtn.addEventListener('mouseover', function() {
+            this.style.backgroundColor = '#2980b9';
+            this.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.4)';
+        });
+
+        freeTrialBtn.addEventListener('mouseout', function() {
+            this.style.backgroundColor = '#3498db';
+            this.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.2)';
+        });
+
+        // 添加点击事件 - 在当前标签页跳转
+        freeTrialBtn.addEventListener('click', function() {
+            console.log('跳转到免费体验版本');
+            window.location.href = 'https://q1706188538.github.io/taowang/';
+        });
+
+        // 组装UI - 添加断开连接按钮、兑换代币按钮和免费体验按钮
         walletInfo.appendChild(disconnectBtn);
         walletInfo.appendChild(exchangeBtn);
+        walletInfo.appendChild(freeTrialBtn);
         walletUI.appendChild(connectBtn);
         walletUI.appendChild(walletInfo);
 
@@ -210,11 +235,31 @@ const WalletManager = {
         hint.innerHTML = '没有MetaMask? <a href="https://metamask.io/download.html" target="_blank" style="color: #f5a623; text-decoration: none;">点击这里安装</a>';
         hint.style.cssText = 'font-size: 14px; margin-top: 20px;';
 
+        // 创建免费体验按钮
+        const freeTrialButton = document.createElement('button');
+        freeTrialButton.textContent = '免费体验版本';
+        freeTrialButton.style.cssText = 'background-color: #3498db; color: white; border: none; padding: 12px 25px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; margin-top: 20px; transition: background-color 0.3s;';
+
+        // 鼠标悬停效果
+        freeTrialButton.onmouseover = function() {
+            this.style.backgroundColor = '#2980b9';
+        };
+        freeTrialButton.onmouseout = function() {
+            this.style.backgroundColor = '#3498db';
+        };
+
+        // 添加点击事件 - 在当前标签页跳转
+        freeTrialButton.onclick = function() {
+            console.log('从登录屏幕跳转到免费体验版本');
+            window.location.href = 'https://q1706188538.github.io/taowang/';
+        };
+
         // 组装登录屏幕
         loginScreen.appendChild(title);
         loginScreen.appendChild(description);
         loginScreen.appendChild(metamaskIcon);
         loginScreen.appendChild(connectButton);
+        loginScreen.appendChild(freeTrialButton);
         loginScreen.appendChild(hint);
 
         // 添加到页面
