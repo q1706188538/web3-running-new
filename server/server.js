@@ -12,7 +12,7 @@ const { generateExchangeSignature, verifySignature, GAME_SERVER_ADDRESS } = requ
 
 // 创建Express应用
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 9001; // 固定端口为9001
 
 // 数据存储目录
 const DATA_DIR = path.join(__dirname, 'data');

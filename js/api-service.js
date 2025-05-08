@@ -4,7 +4,7 @@
  */
 const ApiService = {
     // API基础URL
-    baseUrl: 'http://localhost:3000/api',
+    baseUrl: 'http://localhost:9001/api',
 
     // 设置API基础URL
     setBaseUrl: function(url) {
