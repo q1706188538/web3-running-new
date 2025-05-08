@@ -496,5 +496,82 @@ const ApiService = {
             console.error('获取兑换历史出错:', error.message);
             return [];
         }
+    },
+
+    // 获取兑换签名
+    getExchangeSignature: async function(playerAddress, tokenAmount, gameCoins) {
+        if (!playerAddress) {
+            console.error('获取兑换签名失败: 玩家地址为空');
+            return { success: false, error: '玩家地址为空' };
+        }
+
+        if (!tokenAmount || tokenAmount <= 0) {
+            console.error('获取兑换签名失败: 代币数量无效');
+            return { success: false, error: '代币数量必须大于0' };
+        }
+
+        if (!gameCoins || gameCoins <= 0) {
+            console.error('获取兑换签名失败: 游戏金币数量无效');
+            return { success: false, error: '游戏金币数量必须大于0' };
+        }
+
+        // 获取合约地址
+        const contractAddress = typeof GameConfig !== 'undefined' &&
+                               GameConfig.TOKEN_EXCHANGE &&
+                               GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS ?
+                               GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS :
+                               '0xeb246449b283f9a98933a32132bee0ba7a2fdce6';
+
+        try {
+            const url = `${this.baseUrl}/sign-exchange`;
+            console.log('API请求URL:', url);
+            console.log('请求方法: POST');
+            console.log('请求体:', JSON.stringify({
+                playerAddress,
+                tokenAmount,
+                gameCoins,
+                contractAddress
+            }, null, 2));
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    playerAddress,
+                    tokenAmount,
+                    gameCoins,
+                    contractAddress
+                })
+            });
+
+            console.log('API响应状态:', response.status, response.statusText);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API响应错误:', errorText);
+                try {
+                    const errorData = JSON.parse(errorText);
+                    return { success: false, error: errorData.error || '获取兑换签名失败' };
+                } catch (e) {
+                    return { success: false, error: `获取兑换签名失败: ${response.status} ${response.statusText}` };
+                }
+            }
+
+            const result = await response.json();
+            console.log('获取兑换签名成功:', result);
+
+            return {
+                success: true,
+                signature: result.signature,
+                nonce: result.nonce,
+                message: '获取兑换签名成功'
+            };
+        } catch (error) {
+            console.error('获取兑换签名出错:', error);
+            console.error('错误详情:', error.message);
+            return { success: false, error: error.message || '获取兑换签名时发生错误' };
+        }
     }
 };

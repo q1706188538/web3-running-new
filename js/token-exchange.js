@@ -17,7 +17,7 @@ const TokenExchange = {
 
     // 兑换配置
     config: {
-        TOKEN_NAME: "TRX",
+        TOKEN_NAME: "TWB",
         COINS_PER_TOKEN: 1000,
         MIN_EXCHANGE_AMOUNT: 1,
         MAX_EXCHANGE_AMOUNT: 1000,
@@ -25,7 +25,7 @@ const TokenExchange = {
     },
 
     // 初始化
-    init: function() {
+    init: async function() {
         if (this.initialized) {
             return;
         }
@@ -43,6 +43,52 @@ const TokenExchange = {
 
         // 添加事件监听器
         this.addEventListeners();
+
+        // 初始化Web3代币合约
+        if (typeof Web3TokenContract !== 'undefined') {
+            try {
+                const initResult = await Web3TokenContract.init();
+                if (initResult) {
+                    console.log('Web3代币合约初始化成功');
+
+                    // 获取代币信息
+                    const tokenInfo = await Web3TokenContract.getTokenInfo();
+                    if (tokenInfo) {
+                        console.log('获取到代币信息:', tokenInfo);
+
+                        // 更新代币名称
+                        if (tokenInfo.symbol) {
+                            this.config.TOKEN_NAME = tokenInfo.symbol;
+                            console.log('更新代币名称为:', tokenInfo.symbol);
+
+                            // 更新UI中的代币名称
+                            const unitLabels = document.querySelectorAll('.token-unit-label');
+                            unitLabels.forEach(label => {
+                                label.textContent = tokenInfo.symbol;
+                            });
+                        }
+                    }
+
+                    // 监听代币转账事件
+                    Web3TokenContract.listenToTransferEvents(eventData => {
+                        console.log('收到代币转账事件，更新余额:', eventData);
+                        this.updateBalances();
+                    });
+
+                    // 添加页面卸载时的清理函数
+                    window.addEventListener('beforeunload', () => {
+                        console.log('页面即将卸载，停止事件监听');
+                        Web3TokenContract.stopListeningToTransferEvents();
+                    });
+                } else {
+                    console.warn('Web3代币合约初始化失败，将使用API模式');
+                }
+            } catch (error) {
+                console.error('初始化Web3代币合约时出错:', error);
+            }
+        } else {
+            console.warn('Web3TokenContract未定义，将使用API模式');
+        }
 
         // 标记为已初始化
         this.initialized = true;
@@ -380,13 +426,32 @@ const TokenExchange = {
             if (typeof ApiService !== 'undefined') {
                 this.currentCoins = await ApiService.getCoins(this.walletAddress);
                 console.log('当前金币余额:', this.currentCoins);
-
-                // 获取代币余额
-                this.currentTokens = await ApiService.getTokenBalance(this.walletAddress);
-                console.log('当前代币余额:', this.currentTokens);
             } else {
-                console.error('ApiService不可用，无法获取余额信息');
+                console.error('ApiService不可用，无法获取金币余额');
                 return;
+            }
+
+            // 获取代币余额 - 优先使用Web3合约
+            if (typeof Web3TokenContract !== 'undefined' && Web3TokenContract.tokenContract) {
+                try {
+                    const balanceResult = await Web3TokenContract.getBalance(this.walletAddress);
+                    if (balanceResult) {
+                        this.currentTokens = parseFloat(balanceResult.formatted);
+                        console.log('从Web3合约获取的代币余额:', this.currentTokens);
+                    } else {
+                        // 如果Web3获取失败，回退到API
+                        this.currentTokens = await ApiService.getTokenBalance(this.walletAddress);
+                        console.log('从API获取的代币余额:', this.currentTokens);
+                    }
+                } catch (error) {
+                    console.error('从Web3获取代币余额失败，回退到API:', error);
+                    this.currentTokens = await ApiService.getTokenBalance(this.walletAddress);
+                    console.log('从API获取的代币余额:', this.currentTokens);
+                }
+            } else {
+                // 如果Web3合约不可用，使用API
+                this.currentTokens = await ApiService.getTokenBalance(this.walletAddress);
+                console.log('从API获取的代币余额:', this.currentTokens);
             }
 
             // 更新UI
@@ -505,25 +570,107 @@ const TokenExchange = {
         this.showLoading(true);
 
         try {
-            // 调用API执行兑换
-            if (typeof ApiService !== 'undefined') {
-                const result = await ApiService.exchangeTokens(this.walletAddress, tokenAmount);
+            // 使用Web3合约进行兑换
+            if (typeof Web3TokenContract !== 'undefined' && Web3TokenContract.tokenContract) {
+                console.log('使用Web3合约进行代币兑换...');
 
-                if (result.success) {
+                // 获取游戏金币数据
+                const gameCoinsToUse = totalCoinsNeeded;
+
+                console.log('兑换参数:');
+                console.log('- 玩家地址:', this.walletAddress);
+                console.log('- 代币数量:', tokenAmount);
+                console.log('- 游戏金币数量:', gameCoinsToUse);
+
+                // 首先从API获取签名
+                try {
+                    // 获取签名数据
+                    let signatureData = null;
+
+                    if (typeof ApiService !== 'undefined') {
+                        try {
+                            // 从API获取签名
+                            signatureData = await ApiService.getExchangeSignature(
+                                this.walletAddress,
+                                tokenAmount,
+                                gameCoinsToUse
+                            );
+
+                            if (!signatureData || !signatureData.success) {
+                                throw new Error(signatureData?.error || '获取签名失败');
+                            }
+
+                            console.log('获取到交易签名:', signatureData);
+                        } catch (signError) {
+                            console.error('获取交易签名失败:', signError);
+                            throw new Error('获取交易签名失败，请稍后重试');
+                        }
+                    } else {
+                        throw new Error('ApiService不可用，无法获取交易签名');
+                    }
+
+                    // 调用Web3TokenContract的exchangeCoinsForTokens方法
+                    const exchangeResult = await Web3TokenContract.exchangeCoinsForTokensWithSignature(
+                        tokenAmount,
+                        gameCoinsToUse,
+                        signatureData.nonce,
+                        signatureData.signature
+                    );
+
+                    if (!exchangeResult.success) {
+                        throw new Error(exchangeResult.error || '兑换失败，请稍后重试');
+                    }
+
+                    // 获取交易结果
+                    const tx = exchangeResult.data;
+
+                    console.log('兑换交易已提交:', tx);
+
                     // 兑换成功
-                    this.showResultMessage(result.message || `成功兑换 ${tokenAmount} ${this.config.TOKEN_NAME}`, 'success');
+                    this.showResultMessage(`成功兑换 ${tokenAmount} ${this.config.TOKEN_NAME}`, 'success');
 
                     // 更新余额信息
                     await this.updateBalances();
 
                     // 更新计算结果
                     this.updateCalculation();
-                } else {
-                    // 兑换失败
-                    this.showResultMessage(result.error || '兑换失败，请稍后重试', 'error');
+
+                    // 更新游戏中的金币数量（通过API）
+                    if (typeof ApiService !== 'undefined') {
+                        try {
+                            // 只更新金币数量，不执行兑换
+                            await ApiService.updateCoins(this.walletAddress, this.currentCoins - totalCoinsNeeded);
+                        } catch (apiError) {
+                            console.error('更新游戏金币数量失败:', apiError);
+                            this.showResultMessage('代币兑换成功，但游戏金币数量更新失败，请刷新页面', 'warning');
+                        }
+                    }
+                } catch (contractError) {
+                    console.error('合约交互失败:', contractError);
+
+                    let errorMessage = '兑换失败，请稍后重试';
+
+                    // 解析错误消息
+                    if (contractError.message.includes('user rejected transaction')) {
+                        errorMessage = '用户取消了交易';
+                    } else if (contractError.message.includes('insufficient funds')) {
+                        errorMessage = 'Gas费用不足，请确保您的钱包中有足够的BNB';
+                    } else if (contractError.message.includes('execution reverted')) {
+                        // 尝试提取合约错误消息
+                        const revertReason = contractError.message.match(/reason string: '(.+?)'/);
+                        if (revertReason && revertReason[1]) {
+                            errorMessage = `合约执行失败: ${revertReason[1]}`;
+                        }
+                    } else if (contractError.message.includes('nonce already used')) {
+                        errorMessage = '交易已被处理，请刷新页面后重试';
+                    } else if (contractError.message.includes('invalid signature')) {
+                        errorMessage = '签名验证失败，请刷新页面后重试';
+                    }
+
+                    this.showResultMessage(errorMessage, 'error');
                 }
             } else {
-                this.showResultMessage('ApiService不可用，无法执行兑换', 'error');
+                this.showResultMessage('Web3合约不可用，无法执行兑换', 'error');
             }
         } catch (error) {
             console.error('执行兑换出错:', error);

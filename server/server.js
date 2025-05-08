@@ -8,6 +8,7 @@ const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
+const { generateExchangeSignature, verifySignature, GAME_SERVER_ADDRESS } = require('./sign-exchange');
 
 // 创建Express应用
 const app = express();
@@ -58,12 +59,16 @@ app.use((req, res, next) => {
 });
 
 // 健康检查端点
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', (_, res) => {
+    res.status(200).json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        gameServerAddress: GAME_SERVER_ADDRESS
+    });
 });
 
 // 检查data目录端点
-app.get('/check-data-dir', (req, res) => {
+app.get('/check-data-dir', (_, res) => {
     try {
         // 确保data目录存在
         if (!fs.existsSync(DATA_DIR)) {
@@ -583,8 +588,71 @@ function isValidWalletAddress(address) {
     return isValid;
 }
 
+/**
+ * 获取兑换签名
+ * POST /api/sign-exchange
+ * 请求体: { playerAddress, tokenAmount, gameCoins, contractAddress }
+ */
+app.post('/api/sign-exchange', async (req, res) => {
+    console.log('收到签名请求:', req.body);
+
+    const { playerAddress, tokenAmount, gameCoins, contractAddress } = req.body;
+
+    // 验证参数
+    if (!playerAddress) {
+        return res.status(400).json({ success: false, error: '玩家地址不能为空' });
+    }
+
+    if (!tokenAmount || tokenAmount <= 0) {
+        return res.status(400).json({ success: false, error: '代币数量必须大于0' });
+    }
+
+    if (!gameCoins || gameCoins <= 0) {
+        return res.status(400).json({ success: false, error: '游戏金币数量必须大于0' });
+    }
+
+    if (!contractAddress) {
+        return res.status(400).json({ success: false, error: '合约地址不能为空' });
+    }
+
+    // 验证钱包地址格式
+    if (!isValidWalletAddress(playerAddress)) {
+        return res.status(400).json({ success: false, error: '无效的玩家地址格式' });
+    }
+
+    if (!isValidWalletAddress(contractAddress)) {
+        return res.status(400).json({ success: false, error: '无效的合约地址格式' });
+    }
+
+    try {
+        // 生成签名
+        const result = await generateExchangeSignature(playerAddress, tokenAmount, gameCoins, contractAddress);
+
+        if (!result.success) {
+            return res.status(500).json({ success: false, error: result.error || '生成签名失败' });
+        }
+
+        // 验证签名（可选，用于调试）
+        const verifyResult = await verifySignature(playerAddress, tokenAmount, gameCoins, result.nonce, contractAddress, result.signature);
+        console.log('签名验证结果:', verifyResult);
+
+        // 返回签名
+        res.status(200).json({
+            success: true,
+            signature: result.signature,
+            nonce: result.nonce,
+            signer: GAME_SERVER_ADDRESS,
+            message: '签名生成成功'
+        });
+    } catch (error) {
+        console.error('生成签名时出错:', error);
+        res.status(500).json({ success: false, error: error.message || '生成签名时出错' });
+    }
+});
+
 // 启动服务器
 app.listen(PORT, () => {
     console.log(`服务器已启动，监听端口 ${PORT}`);
     console.log(`数据存储目录: ${DATA_DIR}`);
+    console.log(`游戏服务器地址: ${GAME_SERVER_ADDRESS}`);
 });

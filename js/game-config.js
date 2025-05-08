@@ -24,7 +24,7 @@ const GameConfig = {
     // 代币兑换相关配置
     TOKEN_EXCHANGE: {
         // 代币名称
-        TOKEN_NAME: "TRX",
+        TOKEN_NAME: "TWB",
 
         // 兑换比例：多少游戏金币兑换1个代币
         COINS_PER_TOKEN: 1000,
@@ -36,7 +36,16 @@ const GameConfig = {
         MAX_EXCHANGE_AMOUNT: 1000,
 
         // 兑换手续费（百分比）
-        EXCHANGE_FEE_PERCENT: 2
+        EXCHANGE_FEE_PERCENT: 2,
+
+        // 代币合约地址
+        CONTRACT_ADDRESS: "0xeb246449b283f9a98933a32132bee0ba7a2fdce6",
+
+        // 游戏服务器合约地址（用于验证签名）
+        GAME_SERVER_ADDRESS: "0xE628408B47918c17cf6B97dDfa2A27c9a1CF451d",
+
+        // 合约所在网络ID（1=主网，56=BSC主网，97=BSC测试网）
+        NETWORK_ID: 56
     },
 
     // 初始化
