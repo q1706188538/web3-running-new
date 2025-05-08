@@ -253,35 +253,7 @@ const GameStatusPanel = {
 
         // 所有按钮已删除 - 不需要向最终玩家展示这些外挂功能
 
-        // 创建代币兑换按钮
-        const exchangeButtonElement = document.createElement('div');
-        exchangeButtonElement.style.cssText = 'display: inline-flex; align-items: center; background-color: transparent; padding: 3px 8px; margin: 0 5px;';
-
-        const exchangeButton = document.createElement('button');
-        exchangeButton.id = 'token-exchange-button-panel';
-        exchangeButton.textContent = '兑换代币';
-        exchangeButton.style.cssText = `
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            padding: 5px 10px;
-            font-size: 14px;
-            cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-        `;
-
-        // 添加点击事件
-        exchangeButton.addEventListener('click', function() {
-            if (typeof TokenExchange !== 'undefined') {
-                TokenExchange.show();
-            } else {
-                console.error('TokenExchange模块未加载');
-                alert('代币兑换功能暂时不可用，请稍后重试');
-            }
-        });
-
-        exchangeButtonElement.appendChild(exchangeButton);
+        // 代币兑换按钮已移至钱包连接面板，从游戏状态面板中移除
 
         // 组装面板 - 单行横向布局
         this.panel.appendChild(coinsElement);
@@ -291,7 +263,6 @@ const GameStatusPanel = {
         this.panel.appendChild(progressBar); // 添加隐藏的进度条元素
         this.panel.appendChild(skinsElement);
         this.panel.appendChild(currentSkinElement);
-        this.panel.appendChild(exchangeButtonElement);
 
         // 添加到页面
         document.body.appendChild(this.panel);

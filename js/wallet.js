@@ -43,10 +43,10 @@ const WalletManager = {
         connectBtn.textContent = '连接钱包';
         connectBtn.style.cssText = 'background-color: #f5a623; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;';
 
-        // 钱包信息区域 - 极简版，只有断开连接按钮，没有背景
+        // 钱包信息区域 - 极简版，包含断开连接按钮和兑换代币按钮，没有背景
         const walletInfo = document.createElement('div');
         walletInfo.id = 'wallet-info';
-        walletInfo.style.cssText = 'display: none; position: fixed; top: 10px; right: 10px; z-index: 1001;';
+        walletInfo.style.cssText = 'display: none; position: fixed; top: 10px; right: 10px; z-index: 1001; flex-direction: column; align-items: flex-end; gap: 10px;';
 
         // 断开连接按钮 - 移到右上角，没有背景
         const disconnectBtn = document.createElement('button');
@@ -55,8 +55,37 @@ const WalletManager = {
         disconnectBtn.textContent = '断开连接';
         disconnectBtn.style.cssText = 'background-color: #e74c3c; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);';
 
-        // 组装UI - 只添加断开连接按钮
+        // 创建兑换代币按钮 - 放在断开连接按钮下方
+        const exchangeBtn = document.createElement('button');
+        exchangeBtn.id = 'exchange-token-btn';
+        exchangeBtn.className = 'wallet-button';
+        exchangeBtn.textContent = '兑换代币';
+        exchangeBtn.style.cssText = 'background-color: #4CAF50; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); transition: all 0.2s ease;';
+
+        // 添加悬停效果
+        exchangeBtn.addEventListener('mouseover', function() {
+            this.style.backgroundColor = '#45a049';
+            this.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.4)';
+        });
+
+        exchangeBtn.addEventListener('mouseout', function() {
+            this.style.backgroundColor = '#4CAF50';
+            this.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.2)';
+        });
+
+        // 添加点击事件
+        exchangeBtn.addEventListener('click', function() {
+            if (typeof TokenExchange !== 'undefined') {
+                TokenExchange.show();
+            } else {
+                console.error('TokenExchange模块未加载');
+                alert('代币兑换功能暂时不可用，请稍后重试');
+            }
+        });
+
+        // 组装UI - 添加断开连接按钮和兑换代币按钮
         walletInfo.appendChild(disconnectBtn);
+        walletInfo.appendChild(exchangeBtn);
         walletUI.appendChild(connectBtn);
         walletUI.appendChild(walletInfo);
 
@@ -261,6 +290,20 @@ const WalletManager = {
 
                 // 处理账户变化（这会触发数据同步和登录成功事件）
                 await this.handleAccountsChanged(accounts);
+
+                // 确保游戏容器可见
+                const container = document.getElementById('container');
+                if (container && container.style.display === 'none') {
+                    console.log('重新连接后显示游戏容器');
+                    container.style.display = 'block';
+                }
+
+                // 确保所有canvas元素可见
+                document.querySelectorAll('canvas').forEach(function(canvas) {
+                    if (canvas.style.display === 'none') {
+                        canvas.style.display = 'block';
+                    }
+                });
 
                 return true;
             } catch (error) {
@@ -472,6 +515,12 @@ const WalletManager = {
                 }, 10);
             }
 
+            // 确保所有canvas元素隐藏
+            document.querySelectorAll('canvas').forEach(function(canvas) {
+                canvas.style.display = 'none';
+                console.log('已隐藏canvas元素');
+            });
+
             // 尝试所有可能的方法回到主菜单
 
             // 1. 如果游戏有自己的回到主菜单函数，调用它
@@ -563,8 +612,8 @@ const WalletManager = {
             localStorage.setItem('last_connected_account', this.account);
             console.log('已更新last_connected_account:', this.account);
 
-            // 显示断开连接按钮
-            document.getElementById('wallet-info').style.display = 'block';
+            // 显示钱包信息区域（包含断开连接按钮和兑换代币按钮）
+            document.getElementById('wallet-info').style.display = 'flex';
             document.getElementById('connect-wallet').style.display = 'none';
 
             // 如果是新连接，触发登录成功事件
@@ -577,7 +626,23 @@ const WalletManager = {
                 const loginScreen = document.getElementById('wallet-login-screen');
                 if (loginScreen) {
                     loginScreen.style.display = 'none';
+                    console.log('已隐藏登录屏幕');
                 }
+
+                // 确保游戏容器可见
+                const container = document.getElementById('container');
+                if (container && container.style.display === 'none') {
+                    container.style.display = 'block';
+                    console.log('账户变化后显示游戏容器');
+                }
+
+                // 确保所有canvas元素可见
+                document.querySelectorAll('canvas').forEach(function(canvas) {
+                    if (canvas.style.display === 'none') {
+                        canvas.style.display = 'block';
+                        console.log('账户变化后显示canvas元素');
+                    }
+                });
 
                 // 启动游戏
                 await this.startGame();
@@ -732,7 +797,14 @@ const WalletManager = {
             const container = document.getElementById('container');
             if (container) {
                 container.style.display = 'block';
+                console.log('已显示游戏容器');
             }
+
+            // 确保所有canvas元素可见
+            document.querySelectorAll('canvas').forEach(function(canvas) {
+                canvas.style.display = 'block';
+                console.log('已显示canvas元素');
+            });
 
             // 更新游戏状态面板
             if (typeof GameStatusPanel !== 'undefined' && this.isConnected()) {
