@@ -105,7 +105,7 @@
         }
         return a
     }
-/*! 更多资源请关注三岁半资源：https://sansuib.com*/
+
     function y(t) {
         t = t || {}, this.IS_MASTER = "boolean" == typeof t.isMaster ? t.isMaster : !1, this.IS_SLAVE = !this.IS_MASTER, this.api = t.api ? t.api : {}, this._targets = t.targets ? t.targets : [], this._callbacks = [], this._channels = [], this.IS_MASTER && t.dataStore && (this.dataStore = t.dataStore), this._setupEventListener()
     }
