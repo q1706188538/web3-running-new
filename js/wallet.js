@@ -190,12 +190,15 @@ const WalletManager = {
 
         if (provider) {
             try {
+                // 保存提供商引用，避免后续被其他钱包插件覆盖
+                this.provider = provider;
+
                 // 初始化Web3
-                this.web3 = new Web3(provider);
-                console.log('Web3初始化成功，使用提供商:', provider === window.ethereum ? 'window.ethereum' : '其他提供商');
+                this.web3 = new Web3(this.provider);
+                console.log('Web3初始化成功，使用提供商:', this.provider === window.ethereum ? 'window.ethereum' : '其他提供商');
 
                 // 获取已连接的账户
-                const accounts = await provider.request({ method: 'eth_accounts' });
+                const accounts = await this.provider.request({ method: 'eth_accounts' });
 
                 if (accounts.length > 0 && !this.manuallyDisconnected) {
                     // 只有在用户没有主动断开连接的情况下，才自动恢复连接
@@ -208,10 +211,11 @@ const WalletManager = {
                     }
                 }
 
-                // 监听账户变化
-                provider.on('accountsChanged', this.handleAccountsChanged.bind(this));
-                // 监听链变化
-                provider.on('chainChanged', this.handleChainChanged.bind(this));
+                // 先移除可能存在的事件监听器，避免重复
+                this.removeEventListeners();
+
+                // 添加事件监听器
+                this.addEventListeners();
             } catch (error) {
                 console.error('检查连接时出错:', error);
 
@@ -224,7 +228,7 @@ const WalletManager = {
                 }
             }
         } else {
-            console.log('未检测到任何钱包插件');
+            console.log('未检测到MetaMask钱包插件');
 
             // 未检测到钱包插件，如果需要强制登录，显示登录屏幕
             if (this.loginRequired) {
@@ -234,6 +238,58 @@ const WalletManager = {
                 }
             }
         }
+    },
+
+    // 添加事件监听器
+    addEventListeners: function() {
+        if (!this.provider) return;
+
+        console.log('添加MetaMask事件监听器');
+
+        // 使用命名函数，以便后续可以移除
+        this._handleAccountsChanged = this.handleAccountsChanged.bind(this);
+        this._handleChainChanged = this.handleChainChanged.bind(this);
+
+        // 监听账户变化
+        this.provider.on('accountsChanged', this._handleAccountsChanged);
+        // 监听链变化
+        this.provider.on('chainChanged', this._handleChainChanged);
+
+        // 保存监听器状态
+        this.listenersAdded = true;
+    },
+
+    // 移除事件监听器
+    removeEventListeners: function() {
+        if (!this.provider || !this.listenersAdded) return;
+
+        console.log('移除MetaMask事件监听器');
+
+        try {
+            // 移除特定事件监听器
+            if (this._handleAccountsChanged) {
+                this.provider.removeListener('accountsChanged', this._handleAccountsChanged);
+            }
+
+            if (this._handleChainChanged) {
+                this.provider.removeListener('chainChanged', this._handleChainChanged);
+            }
+        } catch (e) {
+            console.log('移除事件监听器时出错:', e);
+
+            // 如果removeListener方法失败，尝试使用off方法
+            try {
+                if (typeof this.provider.off === 'function') {
+                    this.provider.off('accountsChanged', this._handleAccountsChanged);
+                    this.provider.off('chainChanged', this._handleChainChanged);
+                }
+            } catch (offError) {
+                console.log('使用off方法移除事件监听器时出错:', offError);
+            }
+        }
+
+        // 重置监听器状态
+        this.listenersAdded = false;
     },
 
     // 获取钱包提供商 - 只检测MetaMask
@@ -283,8 +339,11 @@ const WalletManager = {
 
         if (provider) {
             try {
+                // 保存提供商引用，避免后续被其他钱包插件覆盖
+                this.provider = provider;
+
                 // 初始化Web3
-                this.web3 = new Web3(provider);
+                this.web3 = new Web3(this.provider);
                 console.log('Web3初始化成功');
 
                 // 清除断开连接标志
@@ -292,9 +351,12 @@ const WalletManager = {
                 localStorage.removeItem('wallet_manually_disconnected');
                 console.log('已清除断开连接标志');
 
+                // 先移除可能存在的事件监听器，避免重复
+                this.removeEventListeners();
+
                 // 尝试获取当前账户
                 try {
-                    const currentAccounts = await provider.request({ method: 'eth_accounts' });
+                    const currentAccounts = await this.provider.request({ method: 'eth_accounts' });
                     console.log('当前已连接账户:', currentAccounts);
                 } catch (e) {
                     console.log('检查当前账户时出错:', e);
@@ -305,9 +367,9 @@ const WalletManager = {
                 let accounts = [];
 
                 // 尝试使用wallet_requestPermissions API强制显示MetaMask
-                if (provider.isMetaMask) {
+                if (this.provider.isMetaMask) {
                     try {
-                        await provider.request({
+                        await this.provider.request({
                             method: 'wallet_requestPermissions',
                             params: [{ eth_accounts: {} }]
                         });
@@ -320,7 +382,7 @@ const WalletManager = {
 
                 try {
                     // 获取账户
-                    accounts = await provider.request({ method: 'eth_requestAccounts' });
+                    accounts = await this.provider.request({ method: 'eth_requestAccounts' });
                     console.log('获取到MetaMask账户:', accounts);
                 } catch (accountsError) {
                     console.error('获取MetaMask账户失败:', accountsError);
@@ -332,7 +394,7 @@ const WalletManager = {
 
                     // 尝试使用备用方法
                     try {
-                        accounts = await provider.enable();
+                        accounts = await this.provider.enable();
                         console.log('使用备用方法获取到MetaMask账户:', accounts);
                     } catch (enableError) {
                         console.error('备用方法获取MetaMask账户也失败:', enableError);
@@ -342,7 +404,7 @@ const WalletManager = {
 
                 // 获取链ID
                 try {
-                    this.chainId = await provider.request({ method: 'eth_chainId' });
+                    this.chainId = await this.provider.request({ method: 'eth_chainId' });
                     console.log('已连接到链ID:', this.chainId);
                 } catch (chainError) {
                     console.error('获取链ID失败:', chainError);
@@ -350,9 +412,16 @@ const WalletManager = {
                     this.chainId = '0x1'; // 默认以太坊主网
                 }
 
+                // 添加事件监听器
+                this.addEventListeners();
+
                 // 处理账户变化（这会触发数据同步和登录成功事件）
                 if (accounts.length > 0) {
                     await this.handleAccountsChanged(accounts);
+
+                    // 保存连接状态到localStorage
+                    localStorage.setItem('metamask_connected', 'true');
+                    localStorage.setItem('metamask_account', accounts[0]);
                 } else {
                     throw new Error('未能获取MetaMask账户');
                 }
@@ -388,36 +457,19 @@ const WalletManager = {
     disconnectWallet: async function() {
         console.log('断开MetaMask钱包连接');
 
-        // 获取MetaMask提供商
-        const provider = this.getWalletProvider();
-
         // 尝试使用MetaMask API断开连接
-        if (this.web3 && provider) {
+        if (this.web3 && this.provider) {
             try {
                 console.log('尝试使用MetaMask API断开连接...');
 
                 // 注意：MetaMask不支持直接断开连接的API，但我们可以尝试清除一些状态
 
-                // 移除所有事件监听器
-                if (typeof provider.removeAllListeners === 'function') {
-                    provider.removeAllListeners();
-                    console.log('已移除所有MetaMask事件监听器');
-                } else if (typeof provider.off === 'function') {
-                    // 尝试移除特定事件监听器
-                    try {
-                        provider.off('accountsChanged');
-                        provider.off('chainChanged');
-                        provider.off('connect');
-                        provider.off('disconnect');
-                        console.log('已移除特定MetaMask事件监听器');
-                    } catch (e) {
-                        console.log('移除特定事件监听器失败:', e);
-                    }
-                }
+                // 移除事件监听器
+                this.removeEventListeners();
 
                 // 尝试获取当前账户，不会弹出MetaMask
                 try {
-                    const accounts = await provider.request({ method: 'eth_accounts' });
+                    const accounts = await this.provider.request({ method: 'eth_accounts' });
                     console.log('断开前的MetaMask账户:', accounts);
                 } catch (e) {
                     console.log('获取断开前MetaMask账户时出错:', e);
@@ -427,8 +479,14 @@ const WalletManager = {
             }
         }
 
+        // 清除账户和Web3实例
         this.account = null;
         this.web3 = null;
+
+        // 清除提供商引用
+        this.provider = null;
+
+        // 更新UI
         document.getElementById('wallet-info').style.display = 'none';
         document.getElementById('connect-wallet').style.display = 'block';
 
@@ -686,53 +744,78 @@ const WalletManager = {
 
     // 处理账户变化
     handleAccountsChanged: async function(accounts) {
-        if (accounts.length === 0) {
-            // 用户断开了连接
-            this.disconnectWallet();
-        } else {
-            // 更新当前账户
-            this.account = accounts[0];
-            console.log('当前账户:', this.account);
+        console.log('处理账户变化:', accounts);
 
-            // 更新last_connected_account
-            localStorage.setItem('last_connected_account', this.account);
-            console.log('已更新last_connected_account:', this.account);
+        // 防止重复处理
+        if (this._handlingAccountsChanged) {
+            console.log('已有一个账户变化处理正在进行，忽略此次调用');
+            return;
+        }
 
-            // 显示钱包信息区域（包含断开连接按钮和兑换代币按钮）
-            document.getElementById('wallet-info').style.display = 'flex';
-            document.getElementById('connect-wallet').style.display = 'none';
+        this._handlingAccountsChanged = true;
 
-            // 如果是新连接，触发登录成功事件
-            if (this.web3) {
-                await this.onLoginSuccess();
-            }
-
-            // 隐藏登录屏幕，允许游戏开始
-            if (this.loginRequired) {
-                const loginScreen = document.getElementById('wallet-login-screen');
-                if (loginScreen) {
-                    loginScreen.style.display = 'none';
-                    console.log('已隐藏登录屏幕');
+        try {
+            if (!accounts || accounts.length === 0) {
+                // 用户断开了连接
+                console.log('检测到账户为空，执行断开连接操作');
+                await this.disconnectWallet();
+            } else {
+                // 检查账户是否真的变化了
+                const newAccount = accounts[0];
+                if (this.account === newAccount) {
+                    console.log('账户未变化，无需处理:', newAccount);
+                    return;
                 }
 
-                // 确保游戏容器可见
-                const container = document.getElementById('container');
-                if (container && container.style.display === 'none') {
-                    container.style.display = 'block';
-                    console.log('账户变化后显示游戏容器');
+                // 更新当前账户
+                this.account = newAccount;
+                console.log('当前账户已更新:', this.account);
+
+                // 更新last_connected_account
+                localStorage.setItem('last_connected_account', this.account);
+                console.log('已更新last_connected_account:', this.account);
+
+                // 显示钱包信息区域（包含断开连接按钮和兑换代币按钮）
+                document.getElementById('wallet-info').style.display = 'flex';
+                document.getElementById('connect-wallet').style.display = 'none';
+
+                // 如果是新连接，触发登录成功事件
+                if (this.web3 && this.provider) {
+                    await this.onLoginSuccess();
                 }
 
-                // 确保所有canvas元素可见
-                document.querySelectorAll('canvas').forEach(function(canvas) {
-                    if (canvas.style.display === 'none') {
-                        canvas.style.display = 'block';
-                        console.log('账户变化后显示canvas元素');
+                // 隐藏登录屏幕，允许游戏开始
+                if (this.loginRequired) {
+                    const loginScreen = document.getElementById('wallet-login-screen');
+                    if (loginScreen) {
+                        loginScreen.style.display = 'none';
+                        console.log('已隐藏登录屏幕');
                     }
-                });
 
-                // 启动游戏
-                await this.startGame();
+                    // 确保游戏容器可见
+                    const container = document.getElementById('container');
+                    if (container && container.style.display === 'none') {
+                        container.style.display = 'block';
+                        console.log('账户变化后显示游戏容器');
+                    }
+
+                    // 确保所有canvas元素可见
+                    document.querySelectorAll('canvas').forEach(function(canvas) {
+                        if (canvas.style.display === 'none') {
+                            canvas.style.display = 'block';
+                            console.log('账户变化后显示canvas元素');
+                        }
+                    });
+
+                    // 启动游戏
+                    await this.startGame();
+                }
             }
+        } catch (error) {
+            console.error('处理账户变化时出错:', error);
+        } finally {
+            // 无论成功还是失败，都重置处理标志
+            this._handlingAccountsChanged = false;
         }
     },
 
