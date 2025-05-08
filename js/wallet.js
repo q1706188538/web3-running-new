@@ -20,13 +20,89 @@ const WalletManager = {
         // 创建登录屏幕
         this.createLoginScreen();
 
+        // 检查是否需要重置连接状态
+        this.checkResetNeeded();
+
         // 绑定按钮事件
         document.getElementById('connect-wallet').addEventListener('click', this.connectWallet.bind(this));
         document.getElementById('disconnect-wallet').addEventListener('click', this.disconnectWallet.bind(this));
         document.getElementById('login-connect-button').addEventListener('click', this.connectWallet.bind(this));
 
+        // 添加页面可见性变化事件监听器
+        document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
+
         // 检查是否已经连接
         this.checkConnection();
+    },
+
+    // 检查是否需要重置连接状态
+    checkResetNeeded: function() {
+        // 检查URL参数是否包含reset_wallet=true
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('reset_wallet') === 'true') {
+            console.log('检测到reset_wallet参数，重置钱包连接状态');
+
+            // 清除所有钱包相关的localStorage
+            localStorage.removeItem('wallet_manually_disconnected');
+            localStorage.removeItem('metamask_connected');
+            localStorage.removeItem('metamask_account');
+            localStorage.removeItem('wallet_connected');
+            localStorage.removeItem('wallet_account');
+            localStorage.removeItem('last_connected_account');
+
+            // 移除URL参数
+            const newUrl = window.location.pathname + window.location.hash;
+            window.history.replaceState({}, document.title, newUrl);
+        }
+    },
+
+    // 处理页面可见性变化
+    handleVisibilityChange: function() {
+        if (!document.hidden) {
+            console.log('页面变为可见，检查钱包连接状态');
+
+            // 当页面从隐藏变为可见时，重新检查连接状态
+            setTimeout(() => {
+                this.refreshConnectionStatus();
+            }, 1000); // 延迟1秒，确保MetaMask有时间更新状态
+        }
+    },
+
+    // 刷新连接状态
+    refreshConnectionStatus: async function() {
+        console.log('刷新钱包连接状态');
+
+        // 如果用户手动断开了连接，不自动重连
+        if (this.manuallyDisconnected) {
+            console.log('用户手动断开了连接，不自动重连');
+            return;
+        }
+
+        // 获取MetaMask提供商
+        const provider = this.getWalletProvider();
+
+        if (provider) {
+            try {
+                // 获取当前连接的账户
+                const accounts = await provider.request({ method: 'eth_accounts' });
+
+                if (accounts.length > 0) {
+                    // MetaMask已连接账户
+                    if (!this.account || this.account !== accounts[0]) {
+                        console.log('检测到MetaMask已连接但网站未连接，更新连接状态');
+                        this.handleAccountsChanged(accounts);
+                    }
+                } else {
+                    // MetaMask未连接账户
+                    if (this.account) {
+                        console.log('检测到MetaMask未连接但网站已连接，断开连接');
+                        this.disconnectWallet();
+                    }
+                }
+            } catch (error) {
+                console.error('刷新连接状态时出错:', error);
+            }
+        }
     },
 
     // 创建UI元素
@@ -504,8 +580,66 @@ const WalletManager = {
 
         console.log('已设置断开连接标志，刷新页面后不会自动重连');
 
+        // 提示用户在MetaMask中断开连接
+        this.showDisconnectInstructions();
+
         // 调用断开连接后的处理函数
         await this.disconnectWalletHandler();
+    },
+
+    // 显示断开连接指导
+    showDisconnectInstructions: function() {
+        // 创建提示框
+        const instructionBox = document.createElement('div');
+        instructionBox.id = 'metamask-disconnect-instructions';
+        instructionBox.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.9); color: white; padding: 20px; border-radius: 10px; z-index: 10000; max-width: 400px; text-align: center; box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);';
+
+        // 创建标题
+        const title = document.createElement('h3');
+        title.textContent = '请在MetaMask中完成断开连接';
+        title.style.cssText = 'margin-top: 0; color: #f5a623; font-size: 18px;';
+
+        // 创建说明
+        const description = document.createElement('p');
+        description.innerHTML = '为了完全断开连接，请在MetaMask钱包中点击<strong>断开连接</strong>，然后刷新页面。<br><br>如果MetaMask提示"断开连接并刷新"，请点击确认。';
+        description.style.cssText = 'margin-bottom: 20px; line-height: 1.5;';
+
+        // 创建图片
+        const image = document.createElement('div');
+        image.style.cssText = 'width: 100px; height: 100px; background-image: url(https://metamask.io/images/metamask-fox.svg); background-size: contain; background-repeat: no-repeat; background-position: center; margin: 0 auto 20px auto;';
+
+        // 创建关闭按钮
+        const closeButton = document.createElement('button');
+        closeButton.textContent = '我知道了';
+        closeButton.style.cssText = 'background-color: #f5a623; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;';
+
+        // 添加关闭按钮事件
+        closeButton.onclick = function() {
+            document.body.removeChild(instructionBox);
+        };
+
+        // 创建重置链接
+        const resetLink = document.createElement('a');
+        resetLink.textContent = '点击这里重置连接状态';
+        resetLink.href = window.location.pathname + '?reset_wallet=true' + window.location.hash;
+        resetLink.style.cssText = 'display: block; margin-top: 15px; color: #f5a623; text-decoration: underline; font-size: 14px;';
+
+        // 组装提示框
+        instructionBox.appendChild(title);
+        instructionBox.appendChild(image);
+        instructionBox.appendChild(description);
+        instructionBox.appendChild(closeButton);
+        instructionBox.appendChild(resetLink);
+
+        // 添加到页面
+        document.body.appendChild(instructionBox);
+
+        // 5秒后自动关闭
+        setTimeout(function() {
+            if (document.body.contains(instructionBox)) {
+                document.body.removeChild(instructionBox);
+            }
+        }, 10000);
     },
 
     // 断开连接后的处理
