@@ -255,14 +255,33 @@ const GameStatusPanel = {
 
         // 代币兑换按钮已移至钱包连接面板，从游戏状态面板中移除
 
-        // 组装面板 - 单行横向布局
+        // 创建钱包地址信息
+        const walletAddressElement = document.createElement('div');
+        walletAddressElement.style.cssText = 'display: inline-flex; align-items: center; background-color: transparent; padding: 3px 8px; margin: 0 5px;';
+
+        const walletIcon = document.createElement('div');
+        walletIcon.style.cssText = 'width: 26px; height: 26px; background-color: #2ecc71; border-radius: 50%; margin-right: 5px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); display: flex; justify-content: center; align-items: center;';
+        walletIcon.innerHTML = '<span style="color: white; font-weight: bold; font-size: 16px;">W</span>';
+
+        const walletLabel = document.createElement('span');
+        walletLabel.textContent = '钱包:';
+        walletLabel.style.cssText = 'font-size: 16px; color: #2ecc71; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);';
+
+        const walletValue = document.createElement('span');
+        walletValue.id = 'status-wallet-address';
+        walletValue.textContent = '未连接';
+        walletValue.style.cssText = 'font-weight: bold; color: #2ecc71; font-size: 18px; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); margin-left: 3px;';
+
+        walletAddressElement.appendChild(walletIcon);
+        walletAddressElement.appendChild(walletLabel);
+        walletAddressElement.appendChild(walletValue);
+
+        // 组装面板 - 单行横向布局，只保留需要的元素
+        this.panel.appendChild(walletAddressElement);
         this.panel.appendChild(coinsElement);
         this.panel.appendChild(highCoinsElement);
         this.panel.appendChild(lastScoreElement);
-        this.panel.appendChild(progressElement);
         this.panel.appendChild(progressBar); // 添加隐藏的进度条元素
-        this.panel.appendChild(skinsElement);
-        this.panel.appendChild(currentSkinElement);
 
         // 添加到页面
         document.body.appendChild(this.panel);
@@ -289,7 +308,14 @@ const GameStatusPanel = {
 
             console.log('从API获取的用户数据:', userData);
 
-            // 账号信息显示已移除
+            // 更新钱包地址显示
+            const walletAddressElement = document.getElementById('status-wallet-address');
+            if (walletAddressElement) {
+                // 显示钱包地址，格式化为前6位...后4位
+                const formattedAddress = walletAddress.substring(0, 6) + '...' + walletAddress.substring(walletAddress.length - 4);
+                walletAddressElement.textContent = formattedAddress;
+                console.log('更新钱包地址显示:', formattedAddress);
+            }
 
             // 更新金币余额
             const coinsElement = document.getElementById('status-coins');
@@ -299,25 +325,18 @@ const GameStatusPanel = {
                 coinsElement.textContent = coins.toLocaleString(); // 使用逗号分隔的数字格式
             }
 
-            // 获取游戏进度百分比
-            let progressPercentage = 0;
-            try {
-                progressPercentage = await WalletProgress.getProgressPercentage();
-            } catch (error) {
-                console.error('获取游戏进度百分比时出错:', error);
-            }
+            // 游戏进度显示已移除
 
-            // 只更新进度文本，不再需要更新进度条的宽度
-            const progressTextElement = document.getElementById('status-progress-text');
-
-            if (progressTextElement) {
-                progressTextElement.textContent = progressPercentage + '%';
-            }
-
-            // 保存进度值到隐藏的进度条元素
+            // 保存进度值到隐藏的进度条元素，用于其他功能可能需要
             const progressBarElement = document.getElementById('status-progress-bar');
             if (progressBarElement) {
-                progressBarElement.setAttribute('data-progress', progressPercentage);
+                try {
+                    const progressPercentage = await WalletProgress.getProgressPercentage();
+                    progressBarElement.setAttribute('data-progress', progressPercentage);
+                } catch (error) {
+                    console.error('获取游戏进度百分比时出错:', error);
+                    progressBarElement.setAttribute('data-progress', '0');
+                }
             }
 
             // 更新累计获得金币
@@ -335,21 +354,7 @@ const GameStatusPanel = {
                 lastScoreElement.textContent = highestScore.toLocaleString();
             }
 
-            // 获取皮肤信息
-            // 注意：由于API可能没有皮肤信息，我们仍然从本地获取
-            const skinsElement = document.getElementById('status-skins');
-            if (skinsElement) {
-                const skinsInfo = DebugTools.getSkinsInfo();
-                skinsElement.textContent = `${skinsInfo.unlockedCount}/${skinsInfo.totalSkins}`;
-            }
-
-            // 更新当前皮肤
-            const currentSkinElement = document.getElementById('status-current-skin');
-            if (currentSkinElement) {
-                const currentSkin = DebugTools.getCurrentSkin();
-                // 只显示当前选择的皮肤编号
-                currentSkinElement.textContent = currentSkin;
-            }
+            // 皮肤信息显示已移除
 
             // 显示面板
             this.showPanel();

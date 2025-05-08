@@ -1,12 +1,136 @@
 {
-  "coins": 112691570198,
-  "highScore": 112691661763,
+  "coins": 112691489500,
+  "highScore": 112691662285,
   "lastScore": 234028,
-  "lastUpdated": "2025-05-08T05:02:08.015Z",
+  "lastUpdated": "2025-05-08T09:28:04.491Z",
   "progress": {
     "level": 1,
-    "distance": 14768,
+    "distance": 98755,
     "lastScore": 234028,
-    "coins": 38
-  }
+    "coins": 206
+  },
+  "tokens": 11,
+  "exchangeHistory": [
+    {
+      "date": "2025-05-08T06:39:24.665Z",
+      "tokenAmount": 1,
+      "coinsAmount": 1000,
+      "feeAmount": 20,
+      "totalCoins": 1020,
+      "coinsPerToken": 1000,
+      "feePercent": 2,
+      "coinsBalanceAfter": 112691549238,
+      "tokensBalanceAfter": 1
+    },
+    {
+      "date": "2025-05-08T06:40:56.721Z",
+      "tokenAmount": 1,
+      "coinsAmount": 1000,
+      "feeAmount": 20,
+      "totalCoins": 1020,
+      "coinsPerToken": 1000,
+      "feePercent": 2,
+      "coinsBalanceAfter": 112691548218,
+      "tokensBalanceAfter": 2
+    },
+    {
+      "date": "2025-05-08T06:43:10.038Z",
+      "tokenAmount": 1,
+      "coinsAmount": 1000,
+      "feeAmount": 20,
+      "totalCoins": 1020,
+      "coinsPerToken": 1000,
+      "feePercent": 2,
+      "coinsBalanceAfter": 112691547198,
+      "tokensBalanceAfter": 3
+    },
+    {
+      "date": "2025-05-08T06:43:19.459Z",
+      "tokenAmount": 1,
+      "coinsAmount": 1000,
+      "feeAmount": 20,
+      "totalCoins": 1020,
+      "coinsPerToken": 1000,
+      "feePercent": 2,
+      "coinsBalanceAfter": 112691546178,
+      "tokensBalanceAfter": 4
+    },
+    {
+      "date": "2025-05-08T06:44:05.243Z",
+      "tokenAmount": 1,
+      "coinsAmount": 1000,
+      "feeAmount": 20,
+      "totalCoins": 1020,
+      "coinsPerToken": 1000,
+      "feePercent": 2,
+      "coinsBalanceAfter": 112691545158,
+      "tokensBalanceAfter": 5
+    },
+    {
+      "date": "2025-05-08T06:47:37.950Z",
+      "tokenAmount": 1,
+      "coinsAmount": 1000,
+      "feeAmount": 20,
+      "totalCoins": 1020,
+      "coinsPerToken": 1000,
+      "feePercent": 2,
+      "coinsBalanceAfter": 112691544138,
+      "tokensBalanceAfter": 6
+    },
+    {
+      "date": "2025-05-08T07:51:18.278Z",
+      "tokenAmount": 1,
+      "coinsAmount": 1000,
+      "feeAmount": 20,
+      "totalCoins": 1020,
+      "coinsPerToken": 1000,
+      "feePercent": 2,
+      "coinsBalanceAfter": 112691543118,
+      "tokensBalanceAfter": 7
+    },
+    {
+      "date": "2025-05-08T07:58:10.208Z",
+      "tokenAmount": 1,
+      "coinsAmount": 1000,
+      "feeAmount": 20,
+      "totalCoins": 1020,
+      "coinsPerToken": 1000,
+      "feePercent": 2,
+      "coinsBalanceAfter": 112691542098,
+      "tokensBalanceAfter": 8
+    },
+    {
+      "date": "2025-05-08T07:58:25.024Z",
+      "tokenAmount": 1,
+      "coinsAmount": 1000,
+      "feeAmount": 20,
+      "totalCoins": 1020,
+      "coinsPerToken": 1000,
+      "feePercent": 2,
+      "coinsBalanceAfter": 112691541078,
+      "tokensBalanceAfter": 9
+    },
+    {
+      "date": "2025-05-08T08:02:19.232Z",
+      "tokenAmount": 1,
+      "coinsAmount": 1000,
+      "feeAmount": 20,
+      "totalCoins": 1020,
+      "coinsPerToken": 1000,
+      "feePercent": 2,
+      "coinsBalanceAfter": 112691540058,
+      "tokensBalanceAfter": 10
+    },
+    {
+      "date": "2025-05-08T08:02:54.672Z",
+      "tokenAmount": 1,
+      "coinsAmount": 1000,
+      "feeAmount": 20,
+      "totalCoins": 1020,
+      "coinsPerToken": 1000,
+      "feePercent": 2,
+      "coinsBalanceAfter": 112691539038,
+      "tokensBalanceAfter": 11
+    }
+  ]
 }
