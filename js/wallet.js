@@ -511,10 +511,22 @@ const WalletManager = {
 
                 // 确保所有canvas元素可见
                 document.querySelectorAll('canvas').forEach(function(canvas) {
-                    if (canvas.style.display === 'none') {
-                        canvas.style.display = 'block';
-                    }
+                    canvas.style.display = 'block';
+                    console.log('Canvas元素已设置为可见:', canvas);
                 });
+
+                // 强制刷新Canvas
+                setTimeout(function() {
+                    document.querySelectorAll('canvas').forEach(function(canvas) {
+                        // 尝试触发重绘
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                            ctx.fillStyle = '#000000';
+                            ctx.fillRect(0, 0, 1, 1);
+                            console.log('Canvas已重绘');
+                        }
+                    });
+                }, 500);
 
                 return true;
             } catch (error) {
@@ -935,11 +947,22 @@ const WalletManager = {
 
                     // 确保所有canvas元素可见
                     document.querySelectorAll('canvas').forEach(function(canvas) {
-                        if (canvas.style.display === 'none') {
-                            canvas.style.display = 'block';
-                            console.log('账户变化后显示canvas元素');
-                        }
+                        canvas.style.display = 'block';
+                        console.log('账户变化后显示canvas元素:', canvas);
                     });
+
+                    // 强制刷新Canvas
+                    setTimeout(function() {
+                        document.querySelectorAll('canvas').forEach(function(canvas) {
+                            // 尝试触发重绘
+                            const ctx = canvas.getContext('2d');
+                            if (ctx) {
+                                ctx.fillStyle = '#000000';
+                                ctx.fillRect(0, 0, 1, 1);
+                                console.log('账户变化后Canvas已重绘');
+                            }
+                        });
+                    }, 500);
 
                     // 启动游戏
                     await this.startGame();
@@ -1106,8 +1129,35 @@ const WalletManager = {
             // 确保所有canvas元素可见
             document.querySelectorAll('canvas').forEach(function(canvas) {
                 canvas.style.display = 'block';
-                console.log('已显示canvas元素');
+                console.log('游戏启动时显示canvas元素:', canvas);
             });
+
+            // 强制刷新Canvas
+            setTimeout(function() {
+                document.querySelectorAll('canvas').forEach(function(canvas) {
+                    // 尝试触发重绘
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        ctx.fillStyle = '#000000';
+                        ctx.fillRect(0, 0, 1, 1);
+                        console.log('游戏启动时Canvas已重绘');
+                    }
+                });
+
+                // 如果没有找到Canvas元素，尝试创建一个
+                if (document.querySelectorAll('canvas').length === 0) {
+                    console.log('未找到Canvas元素，尝试创建一个');
+                    const container = document.getElementById('container');
+                    if (container) {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = window.innerWidth;
+                        canvas.height = window.innerHeight;
+                        canvas.style.display = 'block';
+                        container.appendChild(canvas);
+                        console.log('已创建新的Canvas元素');
+                    }
+                }
+            }, 500);
 
             // 更新游戏状态面板
             if (typeof GameStatusPanel !== 'undefined' && this.isConnected()) {
