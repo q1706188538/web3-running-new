@@ -359,23 +359,11 @@ const Web3TokenContract = {
         }
 
         try {
-            // 检查是否已安装MetaMask
-            if (typeof window.ethereum === 'undefined') {
-                console.error('初始化失败: 未检测到MetaMask');
+            // 调用initWeb3方法初始化Web3
+            const web3Initialized = await this.initWeb3();
+            if (!web3Initialized) {
+                console.error('初始化失败: Web3初始化失败');
                 return false;
-            }
-
-            // 初始化Web3
-            this.web3 = new Web3(window.ethereum);
-            console.log('Web3初始化成功');
-
-            // 获取当前连接的账户
-            const accounts = await this.web3.eth.getAccounts();
-            if (accounts.length > 0) {
-                this.userAddress = accounts[0];
-                console.log('当前用户地址:', this.userAddress);
-            } else {
-                console.warn('未检测到连接的账户');
             }
 
             // 初始化合约实例
@@ -385,6 +373,58 @@ const Web3TokenContract = {
             );
 
             console.log('代币合约初始化成功:', this.contractAddress);
+
+            return true;
+        } catch (error) {
+            console.error('初始化Web3代币合约失败:', error);
+            return false;
+        }
+    },
+
+    // 初始化Web3
+    initWeb3: async function() {
+        try {
+            console.log('初始化Web3...');
+
+            // 检查是否已安装MetaMask
+            if (typeof window.ethereum === 'undefined') {
+                console.error('初始化Web3失败: 未检测到MetaMask');
+                return false;
+            }
+
+            // 初始化Web3
+            this.web3 = new Web3(window.ethereum);
+            console.log('Web3初始化成功');
+
+            // 请求用户授权
+            try {
+                console.log('请求用户授权...');
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                if (accounts.length > 0) {
+                    this.userAddress = accounts[0];
+                    console.log('当前用户地址:', this.userAddress);
+                } else {
+                    console.warn('用户未授权任何账户');
+                    return false;
+                }
+            } catch (requestError) {
+                console.error('请求用户授权失败:', requestError);
+
+                // 尝试获取已授权的账户
+                try {
+                    const accounts = await this.web3.eth.getAccounts();
+                    if (accounts.length > 0) {
+                        this.userAddress = accounts[0];
+                        console.log('当前用户地址:', this.userAddress);
+                    } else {
+                        console.warn('未检测到连接的账户');
+                        return false;
+                    }
+                } catch (getAccountsError) {
+                    console.error('获取账户失败:', getAccountsError);
+                    return false;
+                }
+            }
 
             // 监听账户变化
             window.ethereum.on('accountsChanged', (accounts) => {
@@ -399,7 +439,7 @@ const Web3TokenContract = {
 
             return true;
         } catch (error) {
-            console.error('初始化Web3代币合约失败:', error);
+            console.error('初始化Web3失败:', error);
             return false;
         }
     },
@@ -884,6 +924,16 @@ const Web3TokenContract = {
                     errorMessage = '交易已被处理，请刷新页面后重试';
                 } else if (error.message.includes('invalid signature')) {
                     errorMessage = '签名验证失败，请刷新页面后重试';
+                } else if (error.code === 4100 || error.message.includes('not been authorized') || error.message.includes('Not authorized')) {
+                    errorMessage = '钱包授权失败，请确保已连接钱包并授权应用访问';
+
+                    // 尝试重新连接钱包
+                    console.log('尝试重新连接钱包...');
+                    this.initWeb3().then(() => {
+                        console.log('钱包重新连接成功');
+                    }).catch(reconnectError => {
+                        console.error('钱包重新连接失败:', reconnectError);
+                    });
                 }
 
                 return {

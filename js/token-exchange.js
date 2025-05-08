@@ -531,7 +531,29 @@ const TokenExchange = {
 
         if (!this.walletAddress) {
             this.showResultMessage('请先连接钱包', 'error');
-            return;
+
+            // 尝试连接钱包
+            if (typeof Web3TokenContract !== 'undefined') {
+                try {
+                    console.log('尝试连接钱包...');
+                    await Web3TokenContract.initWeb3();
+
+                    // 检查是否成功连接
+                    if (Web3TokenContract.userAddress) {
+                        this.walletAddress = Web3TokenContract.userAddress;
+                        console.log('钱包连接成功:', this.walletAddress);
+                        this.showResultMessage('钱包已连接，请再次点击兑换按钮', 'success');
+                    } else {
+                        console.log('钱包连接失败');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('连接钱包失败:', error);
+                    return;
+                }
+            } else {
+                return;
+            }
         }
 
         const amountInput = document.getElementById('token-exchange-amount');
