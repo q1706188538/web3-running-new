@@ -657,16 +657,7 @@ const TokenExchange = {
                     // 更新计算结果
                     this.updateCalculation();
 
-                    // 更新游戏中的金币数量（通过API）
-                    if (typeof ApiService !== 'undefined') {
-                        try {
-                            // 只更新金币数量，不执行兑换
-                            await ApiService.updateCoins(this.walletAddress, this.currentCoins - totalCoinsNeeded);
-                        } catch (apiError) {
-                            console.error('更新游戏金币数量失败:', apiError);
-                            this.showResultMessage('代币兑换成功，但游戏金币数量更新失败，请刷新页面', 'warning');
-                        }
-                    }
+                    // 注意：金币已经在后端的/api/sign-exchange端点中被扣除，不需要在前端再次扣除
                 } catch (contractError) {
                     console.error('合约交互失败:', contractError);
 

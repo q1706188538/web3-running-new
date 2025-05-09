@@ -9,7 +9,9 @@
     "start": "concurrently \"npm run start-frontend\" \"npm run start-backend\""
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "concurrently": "^8.0.1"
+    "@walletconnect/qrcode-modal": "^1.8.0",
+    "@walletconnect/web3-provider": "^1.8.0",
+    "concurrently": "^8.0.1",
+    "express": "^4.21.2"
   }
 }

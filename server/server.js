@@ -625,6 +625,37 @@ app.post('/api/sign-exchange', async (req, res) => {
     }
 
     try {
+        // 首先检查用户是否有足够的金币
+        const filePath = getUserDataPath(playerAddress);
+
+        // 读取现有用户数据
+        let userData = {};
+        if (fs.existsSync(filePath)) {
+            userData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        } else {
+            return res.status(400).json({ success: false, error: '用户数据不存在，请先创建用户数据' });
+        }
+
+        // 获取当前金币余额
+        const currentCoins = userData.coins || 0;
+
+        // 检查金币是否足够
+        if (currentCoins < gameCoins) {
+            return res.status(400).json({
+                success: false,
+                error: `金币不足，需要 ${gameCoins} 金币，当前余额 ${currentCoins} 金币`,
+                required: gameCoins,
+                current: currentCoins
+            });
+        }
+
+        // 扣除金币
+        userData.coins = currentCoins - gameCoins;
+        console.log(`扣除金币: ${gameCoins}，剩余金币: ${userData.coins}`);
+
+        // 添加兑换记录
+        userData.exchangeHistory = userData.exchangeHistory || [];
+
         // 生成签名
         const result = await generateExchangeSignature(playerAddress, tokenAmount, gameCoins, contractAddress);
 
@@ -636,13 +667,36 @@ app.post('/api/sign-exchange', async (req, res) => {
         const verifyResult = await verifySignature(playerAddress, tokenAmount, gameCoins, result.nonce, contractAddress, result.signature);
         console.log('签名验证结果:', verifyResult);
 
+        // 添加兑换记录
+        const exchangeRecord = {
+            date: new Date().toISOString(),
+            tokenAmount: tokenAmount,
+            coinsAmount: gameCoins,
+            nonce: result.nonce,
+            signature: result.signature,
+            contractAddress: contractAddress,
+            coinsBalanceAfter: userData.coins
+        };
+
+        userData.exchangeHistory.push(exchangeRecord);
+        console.log(`添加兑换记录:`, exchangeRecord);
+
+        // 更新时间戳
+        userData.lastUpdated = new Date().toISOString();
+
+        // 保存更新后的数据
+        fs.writeFileSync(filePath, JSON.stringify(userData, null, 2));
+        console.log(`用户数据已更新，金币已扣除`);
+
         // 返回签名
         res.status(200).json({
             success: true,
             signature: result.signature,
             nonce: result.nonce,
             signer: GAME_SERVER_ADDRESS,
-            message: '签名生成成功'
+            coinsDeducted: gameCoins,
+            coinsRemaining: userData.coins,
+            message: '签名生成成功，金币已扣除'
         });
     } catch (error) {
         console.error('生成签名时出错:', error);
@@ -651,8 +705,8 @@ app.post('/api/sign-exchange', async (req, res) => {
 });
 
 // 启动服务器
-app.listen(PORT, () => {
-    console.log(`服务器已启动，监听端口 ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`服务器已启动，监听 0.0.0.0:${PORT}`);
     console.log(`数据存储目录: ${DATA_DIR}`);
     console.log(`游戏服务器地址: ${GAME_SERVER_ADDRESS}`);
 });

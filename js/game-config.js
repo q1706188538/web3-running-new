@@ -4,10 +4,10 @@
  */
 const GameConfig = {
     // 游戏开始需要扣除的金币数量
-    GAME_START_COST: 10000,
+    GAME_START_COST: 0,
 
     // 再来一次需要扣除的金币数量
-    RESTART_GAME_COST: 10000,
+    RESTART_GAME_COST: 0,
 
     // 游戏速度系数（1.0为正常速度，小于1.0为减速，大于1.0为加速）
     GAME_SPEED: 1,

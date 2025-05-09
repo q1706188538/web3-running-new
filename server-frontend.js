@@ -19,7 +19,8 @@ app.get('/', (req, res) => {
 });
 
 // 启动服务器
-app.listen(PORT, () => {
-    console.log(`前端服务器已启动，监听端口 ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`前端服务器已启动，监听 0.0.0.0:${PORT}`);
     console.log(`访问地址: http://localhost:${PORT}`);
+    console.log(`内网访问: http://<你的内网IP>:${PORT}`);
 });
