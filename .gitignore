@@ -40,3 +40,5 @@ Thumbs.db
 
 # 用户数据文件
 server/data/*.json
+data/
+server/data/
