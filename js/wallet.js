@@ -10,6 +10,16 @@ const WalletManager = {
     loginRequired: true, // 设置为true，表示必须登录才能玩游戏
     manuallyDisconnected: false, // 用户是否主动断开连接
 
+    // 检测是否是移动设备
+    isMobileDevice: function() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    },
+
+    // 检测是否在MetaMask浏览器中
+    isInMetaMaskBrowser: function() {
+        return window.ethereum && window.ethereum.isMetaMask && /MetaMask\/[0-9\.]+/i.test(navigator.userAgent);
+    },
+
     // 初始化
     init: function() {
         console.log('初始化钱包管理器...');
@@ -196,6 +206,14 @@ const WalletManager = {
 
     // 创建登录屏幕
     createLoginScreen: function() {
+        console.log('创建登录屏幕...');
+
+        // 检查是否是移动设备
+        const isMobile = this.isMobileDevice();
+        const isInMetaMaskBrowser = this.isInMetaMaskBrowser();
+
+        console.log('设备检测: 移动设备 =', isMobile, '在MetaMask浏览器中 =', isInMetaMaskBrowser);
+
         // 创建登录屏幕容器
         const loginScreen = document.createElement('div');
         loginScreen.id = 'wallet-login-screen';
@@ -219,7 +237,14 @@ const WalletManager = {
         // 创建连接按钮
         const connectButton = document.createElement('button');
         connectButton.id = 'login-connect-button';
-        connectButton.textContent = '连接MetaMask钱包';
+
+        // 根据设备类型设置不同的按钮文本
+        if (isMobile && !isInMetaMaskBrowser) {
+            connectButton.textContent = '在移动设备上连接MetaMask';
+        } else {
+            connectButton.textContent = '连接MetaMask钱包';
+        }
+
         connectButton.style.cssText = 'background-color: #f5a623; color: white; border: none; padding: 15px 30px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 18px; transition: background-color 0.3s;';
 
         // 鼠标悬停效果
@@ -232,8 +257,15 @@ const WalletManager = {
 
         // 创建提示文本
         const hint = document.createElement('p');
-        hint.innerHTML = '没有MetaMask? <a href="https://metamask.io/download.html" target="_blank" style="color: #f5a623; text-decoration: none;">点击这里安装</a>';
-        hint.style.cssText = 'font-size: 14px; margin-top: 20px;';
+
+        // 根据设备类型设置不同的提示文本
+        if (isMobile && !isInMetaMaskBrowser) {
+            hint.innerHTML = '在移动设备上，您需要: <br>1. 安装 <a href="https://metamask.io/download.html" target="_blank" style="color: #f5a623; text-decoration: none;">MetaMask应用</a><br>2. 在MetaMask应用内的浏览器中打开本游戏';
+        } else {
+            hint.innerHTML = '没有MetaMask? <a href="https://metamask.io/download.html" target="_blank" style="color: #f5a623; text-decoration: none;">点击这里安装</a>';
+        }
+
+        hint.style.cssText = 'font-size: 14px; margin-top: 20px; line-height: 1.5;';
 
         // 创建免费体验按钮
         const freeTrialButton = document.createElement('button');
@@ -417,6 +449,24 @@ const WalletManager = {
     getWalletProvider: function() {
         console.log('检测MetaMask钱包提供商...');
 
+        // 检查是否是移动设备
+        if (this.isMobileDevice()) {
+            console.log('检测到移动设备');
+
+            // 检查是否在MetaMask浏览器中
+            if (this.isInMetaMaskBrowser()) {
+                console.log('检测到在MetaMask移动浏览器中');
+
+                // 在MetaMask移动浏览器中，ethereum对象应该可用
+                if (window.ethereum && window.ethereum.isMetaMask) {
+                    console.log('检测到MetaMask移动浏览器的ethereum对象');
+                    return window.ethereum;
+                }
+            } else {
+                console.log('不在MetaMask移动浏览器中，需要使用MetaMask应用的内置浏览器');
+            }
+        }
+
         // 检查是否有ethereum提供商
         if (window.ethereum) {
             // 检查是否是MetaMask
@@ -454,6 +504,13 @@ const WalletManager = {
     // 连接钱包 - 只连接MetaMask
     connectWallet: async function() {
         console.log('尝试连接MetaMask钱包...');
+
+        // 检查是否是移动设备
+        if (this.isMobileDevice() && !this.isInMetaMaskBrowser()) {
+            console.log('检测到移动设备，显示移动设备连接指南');
+            this.showMobileConnectGuide();
+            return;
+        }
 
         // 获取MetaMask提供商
         const provider = this.getWalletProvider();
@@ -642,6 +699,95 @@ const WalletManager = {
 
         // 调用断开连接后的处理函数
         await this.disconnectWalletHandler();
+    },
+
+    // 显示移动设备连接指南
+    showMobileConnectGuide: function() {
+        // 创建提示框
+        const guideBox = document.createElement('div');
+        guideBox.id = 'metamask-mobile-guide';
+        guideBox.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.9); color: white; padding: 20px; border-radius: 10px; z-index: 10000; max-width: 90%; width: 350px; text-align: center; box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);';
+
+        // 创建标题
+        const title = document.createElement('h3');
+        title.textContent = '在移动设备上连接MetaMask';
+        title.style.cssText = 'margin-top: 0; color: #f5a623; font-size: 18px;';
+
+        // 创建图片
+        const image = document.createElement('div');
+        image.style.cssText = 'width: 100px; height: 100px; background-image: url(https://metamask.io/images/metamask-fox.svg); background-size: contain; background-repeat: no-repeat; background-position: center; margin: 0 auto 20px auto;';
+
+        // 创建说明
+        const description = document.createElement('div');
+        description.style.cssText = 'margin-bottom: 20px; line-height: 1.5; text-align: left;';
+
+        // 添加步骤说明
+        const steps = document.createElement('ol');
+        steps.style.cssText = 'padding-left: 20px; margin-top: 10px;';
+
+        const step1 = document.createElement('li');
+        step1.innerHTML = '下载并安装 <strong>MetaMask移动应用</strong>';
+        step1.style.cssText = 'margin-bottom: 10px;';
+
+        const step2 = document.createElement('li');
+        step2.innerHTML = '在MetaMask应用中，点击底部的<strong>浏览器图标</strong>';
+        step2.style.cssText = 'margin-bottom: 10px;';
+
+        const step3 = document.createElement('li');
+        step3.innerHTML = '在MetaMask浏览器中输入网址: <strong>' + window.location.href + '</strong>';
+        step3.style.cssText = 'margin-bottom: 10px;';
+
+        const step4 = document.createElement('li');
+        step4.innerHTML = '在MetaMask浏览器中打开的游戏页面上连接钱包';
+        step4.style.cssText = 'margin-bottom: 10px;';
+
+        steps.appendChild(step1);
+        steps.appendChild(step2);
+        steps.appendChild(step3);
+        steps.appendChild(step4);
+
+        description.appendChild(document.createTextNode('在移动设备上，您需要使用MetaMask应用的内置浏览器来玩游戏:'));
+        description.appendChild(steps);
+
+        // 创建下载按钮
+        const downloadButton = document.createElement('a');
+        downloadButton.href = 'https://metamask.io/download/';
+        downloadButton.target = '_blank';
+        downloadButton.textContent = '下载MetaMask';
+        downloadButton.style.cssText = 'background-color: #f5a623; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-block; margin-bottom: 15px;';
+
+        // 创建免费体验按钮
+        const freeTrialButton = document.createElement('a');
+        freeTrialButton.href = 'http://taowwww.blakcat.top/';
+        freeTrialButton.textContent = '免费体验版本';
+        freeTrialButton.style.cssText = 'background-color: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-block; margin-bottom: 15px; margin-left: 10px;';
+
+        // 创建关闭按钮
+        const closeButton = document.createElement('button');
+        closeButton.textContent = '关闭';
+        closeButton.style.cssText = 'background-color: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; display: block; margin: 0 auto;';
+
+        // 添加关闭按钮事件
+        closeButton.onclick = function() {
+            document.body.removeChild(guideBox);
+        };
+
+        // 组装提示框
+        guideBox.appendChild(title);
+        guideBox.appendChild(image);
+        guideBox.appendChild(description);
+
+        // 创建按钮容器
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = 'display: flex; justify-content: center; margin-bottom: 15px;';
+        buttonContainer.appendChild(downloadButton);
+        buttonContainer.appendChild(freeTrialButton);
+
+        guideBox.appendChild(buttonContainer);
+        guideBox.appendChild(closeButton);
+
+        // 添加到页面
+        document.body.appendChild(guideBox);
     },
 
     // 显示断开连接指导
