@@ -17,7 +17,7 @@ const WalletProgress = {
     init: function() {
         // 测试API连接
         if (this.useApi) {
-            fetch('http://localhost:9001/health')
+            fetch('/health') // 使用相对路径
                 .then(response => {
                     const connected = response.ok;
                     console.log('API健康检查结果:', connected ? '成功' : '失败', '状态码:', response.status);
@@ -155,8 +155,8 @@ const WalletProgress = {
                 if (!response.ok) {
                     if (response.status === 404) {
                         console.log('后端没有用户数据，尝试创建新用户数据');
-                        // 创建新用户数据
-                        const createUrl = `http://localhost:9001/create-user-data/${walletAddress}`;
+                        // 创建新用户数据 (使用相对路径)
+                        const createUrl = `/create-user-data/${walletAddress}`; // 使用相对路径
                         await fetch(createUrl);
                         return false;
                     } else {
@@ -168,7 +168,7 @@ const WalletProgress = {
                 const userData = await response.json();
                 if (!userData || Object.keys(userData).length === 0) {
                     console.log('后端返回空用户数据，尝试创建新用户数据');
-                    const createUrl = `http://localhost:9001/create-user-data/${walletAddress}`;
+                    const createUrl = `/create-user-data/${walletAddress}`; // 使用相对路径
                     await fetch(createUrl);
                     return false;
                 }
@@ -201,8 +201,8 @@ const WalletProgress = {
                         // 将本地存储的历史最高得分同步到后端
                         const score = parseInt(savedScore, 10);
                         try {
-                            // 直接使用fetch API保存历史最高得分
-                            const url = `http://localhost:9001/api/user/${walletAddress}`;
+                            // 使用 ApiService 构建 URL 保存历史最高得分
+                            const url = ApiService.buildApiUrl(`/user/${walletAddress}`); // 使用 ApiService 构建
                             const response = await fetch(url, {
                                 method: 'PATCH',
                                 headers: {

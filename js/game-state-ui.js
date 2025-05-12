@@ -10,8 +10,8 @@
     function testApiConnection(callback) {
         console.log('测试API连接...');
 
-        // 直接使用fetch测试API连接
-        fetch('http://localhost:9001/health')
+        // 直接使用fetch测试API连接 (使用相对路径)
+        fetch('/health') // 使用相对路径
         .then(response => {
             const connected = response.ok;
             console.log('API健康检查结果:', connected ? '成功' : '失败', '状态码:', response.status);
@@ -66,10 +66,11 @@
             }
 
             // 确保API端点设置正确
-            if (window.ApiService && typeof window.ApiService.setBaseUrl === 'function') {
-                window.ApiService.setBaseUrl('http://localhost:9001');
-                console.log('游戏UI已重新设置API端点为http://localhost:9001');
-            }
+            // 不再需要强制设置 baseUrl
+            // if (window.ApiService && typeof window.ApiService.setBaseUrl === 'function') {
+            //     // window.ApiService.setBaseUrl('http://localhost:9001'); // 移除强制设置
+            //     // console.log('游戏UI已重新设置API端点为http://localhost:9001');
+            // }
 
             // 修复字体渲染问题
             this.fixBMFontRendering();
@@ -124,10 +125,11 @@
                 this.showBrowserNotification('Please connect your MetaMask wallet');
                 return;
             }
-            
-            const apiUrl = `http://localhost:9001/api/user/${this.walletAddress}`;
+
+            // 使用 ApiService 构建 URL
+            const apiUrl = ApiService.buildApiUrl(`/user/${this.walletAddress}`); // 使用 ApiService 构建
             console.log('获取用户数据URL:', apiUrl);
-            
+
             fetch(apiUrl)
                 .then(response => {
                     if (!response.ok) {
@@ -551,10 +553,11 @@
                 this.showBrowserNotification('Invalid wallet address');
                 return;
             }
-            
-            const apiUrl = `http://localhost:9001/api/user/${address}`;
+
+            // 使用 ApiService 构建 URL
+            const apiUrl = ApiService.buildApiUrl(`/user/${address}`); // 使用 ApiService 构建
             console.log('使用指定地址获取用户数据URL:', apiUrl);
-            
+
             fetch(apiUrl)
                 .then(response => {
                     if (!response.ok) {

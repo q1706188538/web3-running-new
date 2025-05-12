@@ -522,10 +522,11 @@ const WalletGameIntegration = {
                     // 确保ApiService正确初始化
                     if (window.ApiService && typeof window.ApiService.getUserData === 'function') {
                         // 强制设置为9001端口
-                        if (window.ApiService.setBaseUrl) {
-                            window.ApiService.setBaseUrl('http://localhost:9001');
-                            console.log('游戏结束时强制设置API端点为http://localhost:9001');
-                        }
+                        // 不再需要在游戏结束时强制设置 baseUrl
+                        // if (window.ApiService.setBaseUrl) {
+                        //     // window.ApiService.setBaseUrl('http://localhost:9001'); // 移除强制设置
+                        //     // console.log('游戏结束时强制设置API端点为http://localhost:9001');
+                        // }
 
                         // 这里我们直接打印，不等待异步结果，因为onGameOver会处理实际的数据更新
                         ApiService.getUserData(walletAddress)
