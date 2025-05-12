@@ -220,17 +220,17 @@
 		window.addEventListener('DOMContentLoaded', function() {
 			console.log('页面加载完成，初始化组件...');
 
-			// 确保API端点设置正确 - 统一使用9001端口
-			if (window.ApiService && typeof window.ApiService.setBaseUrl === 'function') {
-				window.ApiService.setBaseUrl('http://localhost:9001/api');
-				console.log('API端点已设置为http://localhost:9001/api');
-			}
+			// 确保API端点设置正确 - ApiService 现在应始终使用相对路径
+			// if (window.ApiService && typeof window.ApiService.setBaseUrl === 'function') {
+			// 	// window.ApiService.setBaseUrl('http://localhost:9001/api'); // 不再需要强制设置
+			// 	// console.log('API端点已设置为http://localhost:9001/api');
+			// }
 
 			// 直接测试API连接，不依赖ApiService对象
 			console.log('测试API连接...');
 
-			// 使用fetch API直接测试API连接
-			fetch('http://localhost:9001/health')
+			// 使用fetch API直接测试API连接 (使用相对路径)
+			fetch('/health') // 使用相对路径
 				.then(response => {
 					const connected = response.ok;
 					console.log('API健康检查结果:', connected ? '成功' : '失败', '状态码:', response.status);
@@ -280,8 +280,8 @@
 						console.log('测试API连接...');
 
 						try {
-							// 确保使用9001端口
-							const response = await fetch('http://localhost:9001/health');
+							// 确保使用相对路径
+							const response = await fetch('/health'); // 使用相对路径
 							const connected = response.ok;
 							console.log('API健康检查结果:', connected ? '成功' : '失败', '状态码:', response.status);
 
@@ -325,9 +325,9 @@
 								if (!userDataResponse.ok || userDataResponse.status === 404) {
 									console.log('用户数据不存在，创建新用户数据...');
 
-									// 使用fetch API创建新用户数据
+									// 使用fetch API创建新用户数据 (使用相对路径)
 									console.log('使用fetch API创建新用户数据...');
-									const createUserUrl = `http://localhost:9001/create-user-data/${walletAddress}`;
+									const createUserUrl = `/create-user-data/${walletAddress}`; // 使用相对路径
 									const createResponse = await fetch(createUserUrl);
 									console.log('创建新用户数据结果:', createResponse.ok ? '成功' : '失败', '状态码:', createResponse.status);
 
