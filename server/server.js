@@ -8,7 +8,7 @@ const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
-const { generateExchangeSignature, verifySignature, GAME_SERVER_ADDRESS } = require('./sign-exchange');
+const { generateExchangeSignature, generateRechargeSignature, verifySignature, GAME_SERVER_ADDRESS } = require('./sign-exchange');
 
 // 创建Express应用
 const app = express();
@@ -24,11 +24,11 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 // 中间件
-// 配置CORS，允许所有来源
+// 配置CORS，允许所有来源和所有请求头
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'Expires', '*']
 }));
 
 // 解析JSON请求体
@@ -569,24 +569,140 @@ app.get('/api/user/:walletAddress/exchange-history', (req, res) => {
     }
 });
 
-// 辅助函数：获取用户数据文件路径
-function getUserDataPath(walletAddress) {
-    // 使用钱包地址的小写形式作为文件名
-    const fileName = `${walletAddress.toLowerCase()}.json`;
-    return path.join(DATA_DIR, fileName);
-}
 
-// 辅助函数：验证钱包地址格式
-function isValidWalletAddress(address) {
-    if (!address) return false;
 
-    // 更宽松的验证：以0x开头的至少10位字符
-    const isValid = /^0x[a-fA-F0-9]{10,}$/.test(address);
 
-    console.log(`验证钱包地址: ${address}, 结果: ${isValid}`);
 
-    return isValid;
-}
+/**
+ * 取消兑换，退还金币
+ * POST /api/cancel-exchange
+ * 请求体: { playerAddress, tokenAmount, gameCoins, nonce, reason }
+ */
+app.post('/api/cancel-exchange', async (req, res) => {
+    console.log('收到取消兑换请求:', req.body);
+
+    const { playerAddress, tokenAmount, gameCoins, nonce, reason = '用户取消交易' } = req.body;
+
+    // 验证参数
+    if (!playerAddress) {
+        return res.status(400).json({ success: false, error: '玩家地址不能为空' });
+    }
+
+    if (!tokenAmount || tokenAmount <= 0) {
+        return res.status(400).json({ success: false, error: '代币数量必须大于0' });
+    }
+
+    if (!gameCoins || gameCoins <= 0) {
+        return res.status(400).json({ success: false, error: '游戏金币数量必须大于0' });
+    }
+
+    if (!nonce) {
+        return res.status(400).json({ success: false, error: 'nonce不能为空' });
+    }
+
+    try {
+        // 验证钱包地址格式
+        if (!isValidWalletAddress(playerAddress)) {
+            return res.status(400).json({ success: false, error: '无效的钱包地址格式' });
+        }
+
+        // 获取用户数据文件路径
+        const filePath = getUserDataPath(playerAddress);
+
+        // 检查用户数据是否存在
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ success: false, error: '未找到用户数据' });
+        }
+
+        // 读取用户数据
+        const userData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+        // 检查兑换历史记录
+        userData.exchangeHistory = userData.exchangeHistory || [];
+
+        // 查找对应的兑换记录
+        const exchangeRecord = userData.exchangeHistory.find(record =>
+            record.nonce === nonce &&
+            record.status === 'pending' &&
+            record.gameCoins === gameCoins &&
+            record.tokenAmount === tokenAmount &&
+            record.playerAddress.toLowerCase() === playerAddress.toLowerCase()
+        );
+
+        if (!exchangeRecord) {
+            console.log('未找到对应的兑换记录，可能已经处理过或不存在');
+
+            // 检查是否已经被取消过
+            const cancelledRecord = userData.exchangeHistory.find(record =>
+                record.nonce === nonce &&
+                record.status === 'cancelled'
+            );
+
+            if (cancelledRecord) {
+                console.log('该交易已经被取消过:', cancelledRecord);
+                return res.status(400).json({
+                    success: false,
+                    error: '该交易已经被取消过，不能重复取消',
+                    currentCoins: userData.coins || 0,
+                    cancelledAt: cancelledRecord.cancelledAt
+                });
+            }
+
+            return res.status(404).json({
+                success: false,
+                error: '未找到对应的兑换记录，可能已经处理过或不存在',
+                currentCoins: userData.coins || 0
+            });
+        }
+
+        // 添加时间验证，只允许取消5分钟内的交易
+        const createdAt = new Date(exchangeRecord.createdAt);
+        const now = new Date();
+        const timeDiff = now.getTime() - createdAt.getTime();
+        const fiveMinutes = 5 * 60 * 1000; // 5分钟（毫秒）
+
+        if (timeDiff > fiveMinutes) {
+            console.log('交易已超过5分钟，不能取消');
+            return res.status(400).json({
+                success: false,
+                error: '交易已超过5分钟，不能取消',
+                currentCoins: userData.coins || 0,
+                createdAt: exchangeRecord.createdAt,
+                timeDiff: Math.floor(timeDiff / 1000) + '秒'
+            });
+        }
+
+        // 更新兑换记录状态
+        exchangeRecord.status = 'cancelled';
+        exchangeRecord.cancelReason = reason;
+        exchangeRecord.cancelledAt = new Date().toISOString();
+
+        // 退还金币
+        const currentCoins = userData.coins || 0;
+        const refundedCoins = gameCoins;
+        userData.coins = currentCoins + refundedCoins;
+
+        console.log(`退还金币: ${refundedCoins}，当前金币: ${userData.coins}`);
+
+        // 更新时间戳
+        userData.lastUpdated = new Date().toISOString();
+
+        // 保存更新后的数据
+        fs.writeFileSync(filePath, JSON.stringify(userData, null, 2));
+        console.log(`用户数据已更新，金币已退还`);
+
+        // 返回结果
+        res.status(200).json({
+            success: true,
+            coins: userData.coins,
+            refundedCoins: refundedCoins,
+            message: '兑换已取消，金币已退还'
+        });
+    } catch (error) {
+        console.error('取消兑换时出错:', error);
+        res.status(500).json({ success: false, error: error.message || '取消兑换时出错' });
+    }
+});
 
 /**
  * 获取兑换签名
@@ -670,12 +786,15 @@ app.post('/api/sign-exchange', async (req, res) => {
         // 添加兑换记录
         const exchangeRecord = {
             date: new Date().toISOString(),
+            createdAt: new Date().toISOString(), // 添加创建时间，用于时间验证
             tokenAmount: tokenAmount,
-            coinsAmount: gameCoins,
+            gameCoins: gameCoins, // 使用gameCoins作为字段名，与cancel-exchange端点一致
+            playerAddress: playerAddress, // 添加玩家地址，用于验证
             nonce: result.nonce,
             signature: result.signature,
             contractAddress: contractAddress,
-            coinsBalanceAfter: userData.coins
+            coinsBalanceAfter: userData.coins,
+            status: 'pending' // 添加状态，用于跟踪兑换记录的状态
         };
 
         userData.exchangeHistory.push(exchangeRecord);
@@ -703,6 +822,235 @@ app.post('/api/sign-exchange', async (req, res) => {
         res.status(500).json({ success: false, error: error.message || '生成签名时出错' });
     }
 });
+
+/**
+ * 获取充值签名
+ * POST /api/sign-recharge
+ * 请求体: { playerAddress, tokenAmount, gameCoins, contractAddress }
+ */
+app.post('/api/sign-recharge', async (req, res) => {
+    console.log('收到充值签名请求:', req.body);
+
+    const { playerAddress, tokenAmount, gameCoins, contractAddress } = req.body;
+
+    // 验证参数
+    if (!playerAddress) {
+        return res.status(400).json({ success: false, error: '玩家地址不能为空' });
+    }
+
+    if (!tokenAmount || tokenAmount <= 0) {
+        return res.status(400).json({ success: false, error: '代币数量必须大于0' });
+    }
+
+    if (!gameCoins || gameCoins <= 0) {
+        return res.status(400).json({ success: false, error: '游戏金币数量必须大于0' });
+    }
+
+    if (!contractAddress) {
+        return res.status(400).json({ success: false, error: '合约地址不能为空' });
+    }
+
+    // 验证钱包地址格式
+    if (!isValidWalletAddress(playerAddress)) {
+        return res.status(400).json({ success: false, error: '无效的玩家地址格式' });
+    }
+
+    if (!isValidWalletAddress(contractAddress)) {
+        return res.status(400).json({ success: false, error: '无效的合约地址格式' });
+    }
+
+    try {
+        // 读取现有用户数据
+        const filePath = getUserDataPath(playerAddress);
+        let userData = {};
+
+        if (fs.existsSync(filePath)) {
+            userData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        } else {
+            // 如果用户数据不存在，创建新的用户数据
+            userData = {
+                coins: 0,
+                highScore: 0,
+                lastScore: 0,
+                lastUpdated: new Date().toISOString()
+            };
+        }
+
+        // 确保充值历史记录存在
+        userData.rechargeHistory = userData.rechargeHistory || [];
+
+        // 生成签名
+        const result = await generateRechargeSignature(playerAddress, tokenAmount, gameCoins, contractAddress);
+
+        if (!result.success) {
+            return res.status(500).json({ success: false, error: result.error || '生成充值签名失败' });
+        }
+
+        // 验证签名（可选，用于调试）
+        const verifyResult = await verifySignature(playerAddress, tokenAmount, gameCoins, result.nonce, contractAddress, result.signature);
+        console.log('充值签名验证结果:', verifyResult);
+
+        // 添加充值记录
+        const rechargeRecord = {
+            date: new Date().toISOString(),
+            tokenAmount: tokenAmount,
+            gameCoinsToGain: gameCoins,
+            nonce: result.nonce,
+            signature: result.signature,
+            contractAddress: contractAddress,
+            status: 'pending' // 初始状态为待处理
+        };
+
+        userData.rechargeHistory.push(rechargeRecord);
+        console.log(`添加充值记录:`, rechargeRecord);
+
+        // 更新时间戳
+        userData.lastUpdated = new Date().toISOString();
+
+        // 保存更新后的数据
+        fs.writeFileSync(filePath, JSON.stringify(userData, null, 2));
+        console.log(`用户数据已更新，充值记录已添加`);
+
+        // 返回签名
+        res.status(200).json({
+            success: true,
+            signature: result.signature,
+            nonce: result.nonce,
+            signer: GAME_SERVER_ADDRESS,
+            gameCoinsToGain: gameCoins,
+            message: '充值签名生成成功'
+        });
+    } catch (error) {
+        console.error('生成充值签名时出错:', error);
+        res.status(500).json({ success: false, error: error.message || '生成充值签名时出错' });
+    }
+});
+
+/**
+ * 确认充值完成，添加金币
+ * POST /api/confirm-recharge
+ * 请求体: { playerAddress, tokenAmount, gameCoins, nonce, txHash }
+ */
+app.post('/api/confirm-recharge', async (req, res) => {
+    console.log('收到充值确认请求:', req.body);
+
+    const { playerAddress, tokenAmount, gameCoins, nonce, txHash } = req.body;
+
+    // 验证参数
+    if (!playerAddress) {
+        return res.status(400).json({ success: false, error: '玩家地址不能为空' });
+    }
+
+    if (!tokenAmount || tokenAmount <= 0) {
+        return res.status(400).json({ success: false, error: '代币数量必须大于0' });
+    }
+
+    if (!gameCoins || gameCoins <= 0) {
+        return res.status(400).json({ success: false, error: '游戏金币数量必须大于0' });
+    }
+
+    if (!nonce) {
+        return res.status(400).json({ success: false, error: 'nonce不能为空' });
+    }
+
+    if (!txHash) {
+        return res.status(400).json({ success: false, error: '交易哈希不能为空' });
+    }
+
+    // 验证钱包地址格式
+    if (!isValidWalletAddress(playerAddress)) {
+        return res.status(400).json({ success: false, error: '无效的玩家地址格式' });
+    }
+
+    try {
+        // 读取现有用户数据
+        const filePath = getUserDataPath(playerAddress);
+        if (!fs.existsSync(filePath)) {
+            return res.status(400).json({ success: false, error: '用户数据不存在' });
+        }
+
+        let userData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+        // 确保充值历史记录存在
+        userData.rechargeHistory = userData.rechargeHistory || [];
+
+        // 查找对应的充值记录
+        const rechargeIndex = userData.rechargeHistory.findIndex(record =>
+            record.nonce === nonce && record.status === 'pending');
+
+        if (rechargeIndex === -1) {
+            return res.status(400).json({
+                success: false,
+                error: '找不到对应的待处理充值记录，可能已经处理或不存在'
+            });
+        }
+
+        const rechargeRecord = userData.rechargeHistory[rechargeIndex];
+
+        // 验证充值记录中的金币数量是否与请求中的一致
+        if (rechargeRecord.gameCoinsToGain !== gameCoins) {
+            return res.status(400).json({
+                success: false,
+                error: `充值记录中的金币数量(${rechargeRecord.gameCoinsToGain})与请求中的(${gameCoins})不一致`
+            });
+        }
+
+        // 验证充值记录中的代币数量是否与请求中的一致
+        if (rechargeRecord.tokenAmount !== tokenAmount) {
+            return res.status(400).json({
+                success: false,
+                error: `充值记录中的代币数量(${rechargeRecord.tokenAmount})与请求中的(${tokenAmount})不一致`
+            });
+        }
+
+        // 更新充值记录状态
+        userData.rechargeHistory[rechargeIndex].status = 'completed';
+        userData.rechargeHistory[rechargeIndex].txHash = txHash;
+        userData.rechargeHistory[rechargeIndex].completedAt = new Date().toISOString();
+
+        // 添加金币
+        const oldCoins = userData.coins || 0;
+        userData.coins = oldCoins + gameCoins;
+        console.log(`添加金币: ${gameCoins}，当前金币余额: ${userData.coins}`);
+
+        // 更新时间戳
+        userData.lastUpdated = new Date().toISOString();
+
+        // 保存更新后的数据
+        fs.writeFileSync(filePath, JSON.stringify(userData, null, 2));
+        console.log(`用户数据已更新，充值已完成，金币已添加`);
+
+        // 返回结果
+        res.status(200).json({
+            success: true,
+            coins: userData.coins,
+            addedCoins: gameCoins,
+            message: '充值确认成功，金币已添加'
+        });
+    } catch (error) {
+        console.error('确认充值时出错:', error);
+        res.status(500).json({ success: false, error: error.message || '确认充值时出错' });
+    }
+});
+
+// 辅助函数：获取用户数据文件路径
+function getUserDataPath(walletAddress) {
+    // 使用钱包地址的小写形式作为文件名
+    const fileName = `${walletAddress.toLowerCase()}.json`;
+    return path.join(DATA_DIR, fileName);
+}
+
+// 辅助函数：验证钱包地址格式
+function isValidWalletAddress(address) {
+    if (!address) return false;
+
+    // 更宽松的验证：以0x开头的至少10位字符
+    const isValid = /^0x[a-fA-F0-9]{10,}$/.test(address);
+
+    console.log(`验证钱包地址: ${address}, 结果: ${isValid}`);
+
+    return isValid;
+}
 
 // 启动服务器
 app.listen(PORT, '0.0.0.0', () => {

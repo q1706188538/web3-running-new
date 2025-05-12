@@ -3,13 +3,24 @@
  * 用于与后端服务器通信，保存和获取用户数据
  */
 const ApiService = {
-    // API基础URL - 使用相对路径，自动适应当前域名
-    baseUrl: '/api',
+    // API基础URL - 使用固定的9001端口
+    baseUrl: 'http://localhost:9001/api',
 
     // 设置API基础URL
     setBaseUrl: function(url) {
         this.baseUrl = url;
         console.log('API基础URL已设置为:', url);
+    },
+
+    // 构建API URL的辅助方法
+    buildApiUrl: function(path) {
+        // 如果baseUrl已经包含/api，则直接拼接路径
+        if (this.baseUrl.endsWith('/api')) {
+            return `${this.baseUrl}${path}`;
+        }
+
+        // 否则，添加/api前缀
+        return `${this.baseUrl}/api${path}`;
     },
 
     // 获取用户数据
@@ -20,7 +31,10 @@ const ApiService = {
         }
 
         try {
-            const response = await fetch(`${this.baseUrl}/user/${walletAddress}`);
+            // 使用辅助方法构建API URL
+            const url = this.buildApiUrl(`/user/${walletAddress}`);
+            console.log('获取用户数据URL:', url);
+            const response = await fetch(url);
 
             if (response.status === 404) {
                 console.log('未找到用户数据，返回空对象');
@@ -52,7 +66,7 @@ const ApiService = {
         console.log('尝试保存用户数据到API:', walletAddress, userData);
 
         try {
-            const url = `${this.baseUrl}/user/${walletAddress}`;
+            const url = this.buildApiUrl(`/user/${walletAddress}`);
             console.log('API请求URL:', url);
             console.log('请求方法: POST');
             console.log('请求体:', JSON.stringify(userData, null, 2));
@@ -96,7 +110,9 @@ const ApiService = {
         }
 
         try {
-            const response = await fetch(`${this.baseUrl}/user/${walletAddress}`, {
+            const url = this.buildApiUrl(`/user/${walletAddress}`);
+            console.log('更新用户数据URL:', url);
+            const response = await fetch(url, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json'
@@ -126,7 +142,9 @@ const ApiService = {
         }
 
         try {
-            const response = await fetch(`${this.baseUrl}/user/${walletAddress}/coins`);
+            const url = this.buildApiUrl(`/user/${walletAddress}/coins`);
+            console.log('获取用户金币URL:', url);
+            const response = await fetch(url);
 
             if (!response.ok) {
                 const errorData = await response.json();
@@ -169,7 +187,7 @@ const ApiService = {
         console.log(`尝试更新用户金币到API: ${walletAddress}, 金币: ${coins}, 操作: ${operation}, 原因: ${reason}`);
 
         try {
-            const url = `${this.baseUrl}/user/${walletAddress}/coins`;
+            const url = this.buildApiUrl(`/user/${walletAddress}/coins`);
             console.log('API请求URL:', url);
             console.log('请求方法: POST');
             console.log('请求体:', JSON.stringify({ coins, operation, reason }, null, 2));
@@ -296,16 +314,50 @@ const ApiService = {
     // 测试API连接
     testConnection: async function() {
         try {
-            // 使用相对路径访问health端点
-            const response = await fetch('/health');
+            // 强制使用9001端口
+            let testUrl = 'http://localhost:9001/health';
 
-            if (!response.ok) {
-                throw new Error('API连接测试失败');
+            // 记录当前baseUrl，但不使用它
+            console.log('当前baseUrl:', this.baseUrl);
+            console.log('强制使用9001端口测试API连接，URL:', testUrl);
+
+            // 添加超时设置，避免长时间等待
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+
+            try {
+                const response = await fetch(testUrl, {
+                    signal: controller.signal,
+                    // 添加缓存控制，避免使用缓存的结果
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                });
+
+                // 清除超时
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    console.error('API连接测试失败，状态码:', response.status);
+                    return false;
+                }
+
+                const data = await response.json();
+                console.log('API连接测试成功:', data);
+                return true;
+            } catch (fetchError) {
+                // 清除超时
+                clearTimeout(timeoutId);
+
+                if (fetchError.name === 'AbortError') {
+                    console.error('API连接测试超时');
+                } else {
+                    console.error('API连接测试出错:', fetchError.message);
+                }
+                return false;
             }
-
-            const data = await response.json();
-            console.log('API连接测试成功:', data);
-            return true;
         } catch (error) {
             console.error('API连接测试出错:', error.message);
             return false;
@@ -322,8 +374,17 @@ const ApiService = {
         console.log('尝试创建新用户数据:', walletAddress);
 
         try {
-            // 使用相对路径访问create-user-data端点
-            const url = `/create-user-data/${walletAddress}`;
+            // 使用辅助方法构建API URL
+            // 注意：create-user-data端点不在/api路径下，而是在根路径下
+            let url = `/create-user-data/${walletAddress}`;
+
+            // 如果baseUrl是完整URL（包含http://），则使用相同的主机和端口
+            if (this.baseUrl.startsWith('http')) {
+                const urlParts = this.baseUrl.split('/');
+                const hostPort = urlParts[0] + '//' + urlParts[2]; // 例如 http://localhost:9001
+                url = hostPort + `/create-user-data/${walletAddress}`;
+            }
+
             console.log('API请求URL:', url);
 
             const response = await fetch(url);
@@ -369,7 +430,9 @@ const ApiService = {
         }
 
         try {
-            const response = await fetch(`${this.baseUrl}/user/${walletAddress}/tokens`);
+            const url = this.buildApiUrl(`/user/${walletAddress}/tokens`);
+            console.log('获取用户代币余额URL:', url);
+            const response = await fetch(url);
 
             if (!response.ok) {
                 const errorData = await response.json();
@@ -431,7 +494,7 @@ const ApiService = {
         console.log(`尝试兑换代币: ${tokenAmount} 个代币，需要 ${requiredCoins} 金币，手续费 ${feeAmount} 金币，总计 ${totalCoinsNeeded} 金币`);
 
         try {
-            const url = `${this.baseUrl}/user/${walletAddress}/exchange-tokens`;
+            const url = this.buildApiUrl(`/user/${walletAddress}/exchange-tokens`);
             console.log('API请求URL:', url);
             console.log('请求方法: POST');
             console.log('请求体:', JSON.stringify({ tokenAmount }, null, 2));
@@ -484,7 +547,9 @@ const ApiService = {
         }
 
         try {
-            const response = await fetch(`${this.baseUrl}/user/${walletAddress}/exchange-history`);
+            const url = this.buildApiUrl(`/user/${walletAddress}/exchange-history`);
+            console.log('获取兑换历史URL:', url);
+            const response = await fetch(url);
 
             if (!response.ok) {
                 const errorData = await response.json();
@@ -499,6 +564,8 @@ const ApiService = {
             return [];
         }
     },
+
+
 
     // 获取兑换签名
     getExchangeSignature: async function(playerAddress, tokenAmount, gameCoins) {
@@ -518,14 +585,25 @@ const ApiService = {
         }
 
         // 获取合约地址
-        const contractAddress = typeof GameConfig !== 'undefined' &&
-                               GameConfig.TOKEN_EXCHANGE &&
-                               GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS ?
-                               GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS :
-                               '0xeb246449b283f9a98933a32132bee0ba7a2fdce6';
+        let contractAddress = '';
+        if (typeof GameConfig !== 'undefined' &&
+            GameConfig.TOKEN_EXCHANGE &&
+            GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS) {
+            contractAddress = GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS;
+            console.log('使用配置中的合约地址:', contractAddress);
+        } else {
+            console.error('获取兑换签名失败: 未找到合约地址配置');
+            return { success: false, error: '未找到合约地址配置，请检查GameConfig' };
+        }
 
         try {
-            const url = `${this.baseUrl}/sign-exchange`;
+            console.log('准备获取兑换签名...');
+            console.log('- 玩家地址:', playerAddress);
+            console.log('- 代币数量:', tokenAmount);
+            console.log('- 游戏金币:', gameCoins);
+            console.log('- 合约地址:', contractAddress);
+
+            const url = this.buildApiUrl(`/sign-exchange`);
             console.log('API请求URL:', url);
             console.log('请求方法: POST');
             console.log('请求体:', JSON.stringify({
@@ -564,16 +642,277 @@ const ApiService = {
             const result = await response.json();
             console.log('获取兑换签名成功:', result);
 
+            // 添加更多调试信息
+            if (result.signature) {
+                console.log('- 签名长度:', result.signature.length);
+                console.log('- 签名前10个字符:', result.signature.substring(0, 10) + '...');
+                console.log('- 签名后10个字符:', '...' + result.signature.substring(result.signature.length - 10));
+            }
+
+            if (result.nonce) {
+                console.log('- Nonce:', result.nonce);
+            }
+
+            if (result.signer) {
+                console.log('- 签名者地址:', result.signer);
+                console.log('- 是否与游戏服务器地址匹配:',
+                    typeof GameConfig !== 'undefined' &&
+                    GameConfig.TOKEN_EXCHANGE &&
+                    GameConfig.TOKEN_EXCHANGE.GAME_SERVER_ADDRESS === result.signer);
+            }
+
             return {
                 success: true,
                 signature: result.signature,
                 nonce: result.nonce,
+                signer: result.signer,
                 message: '获取兑换签名成功'
             };
         } catch (error) {
             console.error('获取兑换签名出错:', error);
             console.error('错误详情:', error.message);
+            console.error('错误堆栈:', error.stack || '无堆栈信息');
             return { success: false, error: error.message || '获取兑换签名时发生错误' };
+        }
+    },
+
+    // 获取充值签名
+    getRechargeSignature: async function(playerAddress, tokenAmount, gameCoins) {
+        if (!playerAddress) {
+            console.error('获取充值签名失败: 玩家地址为空');
+            return { success: false, error: '玩家地址为空' };
+        }
+
+        if (!tokenAmount || tokenAmount <= 0) {
+            console.error('获取充值签名失败: 代币数量无效');
+            return { success: false, error: '代币数量必须大于0' };
+        }
+
+        if (!gameCoins || gameCoins <= 0) {
+            console.error('获取充值签名失败: 游戏金币数量无效');
+            return { success: false, error: '游戏金币数量必须大于0' };
+        }
+
+        // 获取合约地址
+        let contractAddress = '';
+        if (typeof GameConfig !== 'undefined' &&
+            GameConfig.TOKEN_RECHARGE &&
+            GameConfig.TOKEN_RECHARGE.CONTRACT_ADDRESS) {
+            contractAddress = GameConfig.TOKEN_RECHARGE.CONTRACT_ADDRESS;
+        } else {
+            console.error('获取充值签名失败: 未找到合约地址配置');
+            return { success: false, error: '未找到合约地址配置，请检查GameConfig' };
+        }
+
+        try {
+            const url = this.buildApiUrl(`/sign-recharge`);
+            console.log('API请求URL:', url);
+            console.log('请求方法: POST');
+            console.log('请求体:', JSON.stringify({
+                playerAddress,
+                tokenAmount,
+                gameCoins,
+                contractAddress
+            }, null, 2));
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    playerAddress,
+                    tokenAmount,
+                    gameCoins,
+                    contractAddress
+                })
+            });
+
+            console.log('API响应状态:', response.status, response.statusText);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API响应错误:', errorText);
+                try {
+                    const errorData = JSON.parse(errorText);
+                    return { success: false, error: errorData.error || '获取充值签名失败' };
+                } catch (e) {
+                    return { success: false, error: `获取充值签名失败: ${response.status} ${response.statusText}` };
+                }
+            }
+
+            const result = await response.json();
+            console.log('获取充值签名成功:', result);
+
+            return {
+                success: true,
+                signature: result.signature,
+                nonce: result.nonce,
+                message: '获取充值签名成功'
+            };
+        } catch (error) {
+            console.error('获取充值签名出错:', error);
+            console.error('错误详情:', error.message);
+            return { success: false, error: error.message || '获取充值签名时发生错误' };
+        }
+    },
+
+    // 取消兑换，退还金币
+    cancelExchange: async function(playerAddress, tokenAmount, gameCoins, nonce) {
+        if (!playerAddress) {
+            console.error('取消兑换失败: 玩家地址为空');
+            return { success: false, error: '玩家地址为空' };
+        }
+
+        if (!tokenAmount || tokenAmount <= 0) {
+            console.error('取消兑换失败: 代币数量无效');
+            return { success: false, error: '代币数量必须大于0' };
+        }
+
+        if (!gameCoins || gameCoins <= 0) {
+            console.error('取消兑换失败: 游戏金币数量无效');
+            return { success: false, error: '游戏金币数量必须大于0' };
+        }
+
+        if (!nonce) {
+            console.error('取消兑换失败: nonce为空');
+            return { success: false, error: 'nonce不能为空' };
+        }
+
+        try {
+            const url = this.buildApiUrl(`/cancel-exchange`);
+            console.log('API请求URL:', url);
+            console.log('请求方法: POST');
+            console.log('请求体:', JSON.stringify({
+                playerAddress,
+                tokenAmount,
+                gameCoins,
+                nonce,
+                reason: '用户取消交易'
+            }, null, 2));
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    playerAddress,
+                    tokenAmount,
+                    gameCoins,
+                    nonce,
+                    reason: '用户取消交易'
+                })
+            });
+
+            console.log('API响应状态:', response.status, response.statusText);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API响应错误:', errorText);
+                try {
+                    const errorData = JSON.parse(errorText);
+                    return { success: false, error: errorData.error || '取消兑换失败' };
+                } catch (e) {
+                    return { success: false, error: `取消兑换失败: ${response.status} ${response.statusText}` };
+                }
+            }
+
+            const result = await response.json();
+            console.log('取消兑换成功，金币已退还:', result);
+
+            return {
+                success: true,
+                coins: result.coins,
+                refundedCoins: result.refundedCoins,
+                message: '兑换已取消，金币已退还'
+            };
+        } catch (error) {
+            console.error('取消兑换出错:', error);
+            console.error('错误详情:', error.message);
+            return { success: false, error: error.message || '取消兑换时发生错误' };
+        }
+    },
+
+    // 确认充值成功，添加金币
+    confirmRecharge: async function(playerAddress, tokenAmount, gameCoins, nonce, txHash) {
+        if (!playerAddress) {
+            console.error('确认充值失败: 玩家地址为空');
+            return { success: false, error: '玩家地址为空' };
+        }
+
+        if (!tokenAmount || tokenAmount <= 0) {
+            console.error('确认充值失败: 代币数量无效');
+            return { success: false, error: '代币数量必须大于0' };
+        }
+
+        if (!gameCoins || gameCoins <= 0) {
+            console.error('确认充值失败: 游戏金币数量无效');
+            return { success: false, error: '游戏金币数量必须大于0' };
+        }
+
+        if (!nonce) {
+            console.error('确认充值失败: nonce为空');
+            return { success: false, error: 'nonce不能为空' };
+        }
+
+        if (!txHash) {
+            console.error('确认充值失败: 交易哈希为空');
+            return { success: false, error: '交易哈希不能为空' };
+        }
+
+        try {
+            const url = this.buildApiUrl(`/confirm-recharge`);
+            console.log('API请求URL:', url);
+            console.log('请求方法: POST');
+            console.log('请求体:', JSON.stringify({
+                playerAddress,
+                tokenAmount,
+                gameCoins,
+                nonce,
+                txHash
+            }, null, 2));
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    playerAddress,
+                    tokenAmount,
+                    gameCoins,
+                    nonce,
+                    txHash
+                })
+            });
+
+            console.log('API响应状态:', response.status, response.statusText);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API响应错误:', errorText);
+                try {
+                    const errorData = JSON.parse(errorText);
+                    return { success: false, error: errorData.error || '确认充值失败' };
+                } catch (e) {
+                    return { success: false, error: `确认充值失败: ${response.status} ${response.statusText}` };
+                }
+            }
+
+            const result = await response.json();
+            console.log('确认充值成功:', result);
+
+            return {
+                success: true,
+                coins: result.coins,
+                addedCoins: result.addedCoins,
+                message: '确认充值成功，金币已添加'
+            };
+        } catch (error) {
+            console.error('确认充值出错:', error);
+            console.error('错误详情:', error.message);
+            return { success: false, error: error.message || '确认充值时发生错误' };
         }
     }
 };

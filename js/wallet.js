@@ -20,6 +20,11 @@ const WalletManager = {
         return window.ethereum && window.ethereum.isMetaMask && /MetaMask\/[0-9\.]+/i.test(navigator.userAgent);
     },
 
+    // 检测是否可以使用MetaMask SDK
+    canUseMetaMaskSDK: function() {
+        return typeof MetaMaskSDKManager !== 'undefined' && MetaMaskSDKManager.sdk !== null;
+    },
+
     // 初始化
     init: function() {
         console.log('初始化钱包管理器...');
@@ -132,9 +137,9 @@ const WalletManager = {
         // 钱包信息区域 - 极简版，包含断开连接按钮和兑换代币按钮，没有背景
         const walletInfo = document.createElement('div');
         walletInfo.id = 'wallet-info';
-        walletInfo.style.cssText = 'display: none; position: fixed; top: 10px; right: 10px; z-index: 1001; flex-direction: column; align-items: flex-end; gap: 10px;';
+        walletInfo.style.cssText = 'display: none; position: fixed; bottom: 10px; right: 10px; z-index: 1001; flex-direction: column; align-items: flex-end; gap: 10px;';
 
-        // 断开连接按钮 - 移到右上角，没有背景
+        // 断开连接按钮 - 移到右下角，没有背景
         const disconnectBtn = document.createElement('button');
         disconnectBtn.id = 'disconnect-wallet';
         disconnectBtn.className = 'wallet-button';
@@ -169,7 +174,35 @@ const WalletManager = {
             }
         });
 
-        // 创建免费体验按钮 - 放在兑换代币按钮下方
+        // 创建充值金币按钮 - 放在兑换代币按钮下方
+        const rechargeBtn = document.createElement('button');
+        rechargeBtn.id = 'recharge-coins-btn';
+        rechargeBtn.className = 'wallet-button';
+        rechargeBtn.textContent = '充值金币';
+        rechargeBtn.style.cssText = 'background-color: #9b59b6; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); transition: all 0.2s ease;';
+
+        // 添加悬停效果
+        rechargeBtn.addEventListener('mouseover', function() {
+            this.style.backgroundColor = '#8e44ad';
+            this.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.4)';
+        });
+
+        rechargeBtn.addEventListener('mouseout', function() {
+            this.style.backgroundColor = '#9b59b6';
+            this.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.2)';
+        });
+
+        // 添加点击事件
+        rechargeBtn.addEventListener('click', function() {
+            if (typeof TokenRecharge !== 'undefined') {
+                TokenRecharge.show();
+            } else {
+                console.error('TokenRecharge模块未加载');
+                alert('充值金币功能暂时不可用，请稍后重试');
+            }
+        });
+
+        // 创建免费体验按钮 - 放在充值金币按钮下方
         const freeTrialBtn = document.createElement('button');
         freeTrialBtn.id = 'free-trial-btn';
         freeTrialBtn.className = 'wallet-button';
@@ -193,9 +226,10 @@ const WalletManager = {
             window.location.href = 'http://taowwww.blakcat.top/';
         });
 
-        // 组装UI - 添加断开连接按钮、兑换代币按钮和免费体验按钮
+        // 组装UI - 添加断开连接按钮、兑换代币按钮、充值金币按钮和免费体验按钮
         walletInfo.appendChild(disconnectBtn);
         walletInfo.appendChild(exchangeBtn);
+        walletInfo.appendChild(rechargeBtn);
         walletInfo.appendChild(freeTrialBtn);
         walletUI.appendChild(connectBtn);
         walletUI.appendChild(walletInfo);
@@ -507,7 +541,21 @@ const WalletManager = {
 
         // 检查是否是移动设备
         if (this.isMobileDevice()) {
-            console.log('检测到移动设备，显示移动设备连接选项');
+            console.log('检测到移动设备');
+
+            // 检查是否可以使用MetaMask直连
+            if (typeof this.canUseMetaMaskDirect === 'function' && this.canUseMetaMaskDirect()) {
+                console.log('检测到可以使用MetaMask直连，尝试直接连接');
+                return this.connectWithMetaMaskDirect();
+            }
+
+            // 检查是否可以使用MetaMask SDK
+            if (this.canUseMetaMaskSDK()) {
+                console.log('检测到可以使用MetaMask SDK，尝试直接连接');
+                return this.connectWithMetaMaskSDK();
+            }
+
+            console.log('显示移动设备连接选项');
             this.showMobileConnectGuide();
             return;
         }
@@ -731,6 +779,27 @@ const WalletManager = {
         description.textContent = '请选择连接方式:';
         description.style.cssText = 'margin-bottom: 20px; line-height: 1.5;';
 
+        // 检查是否可以使用MetaMask SDK
+        const canUseSDK = this.canUseMetaMaskSDK();
+
+        // 如果可以使用MetaMask SDK，添加直接连接按钮
+        if (canUseSDK) {
+            // 创建MetaMask SDK按钮
+            const sdkButton = document.createElement('button');
+            sdkButton.id = 'metamask-sdk-button';
+            sdkButton.innerHTML = '<img src="https://metamask.io/images/metamask-fox.svg" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 8px;">直接连接MetaMask';
+            sdkButton.style.cssText = 'background-color: #f5a623; color: white; border: none; padding: 12px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 15px; display: flex; align-items: center; justify-content: center;';
+
+            // 添加MetaMask SDK按钮事件
+            sdkButton.onclick = () => {
+                document.body.removeChild(guideBox);
+                this.connectWithMetaMaskSDK();
+            };
+
+            // 添加到提示框
+            guideBox.appendChild(sdkButton);
+        }
+
         // 创建WalletConnect按钮
         const walletConnectButton = document.createElement('button');
         walletConnectButton.id = 'wallet-connect-button';
@@ -774,6 +843,12 @@ const WalletManager = {
         // 组装提示框
         guideBox.appendChild(title);
         guideBox.appendChild(description);
+
+        // 如果没有添加SDK按钮，添加其他按钮
+        if (!canUseSDK) {
+            guideBox.appendChild(walletConnectButton);
+        }
+
         guideBox.appendChild(walletConnectButton);
         guideBox.appendChild(metamaskButton);
         guideBox.appendChild(freeTrialButton);
@@ -933,16 +1008,21 @@ const WalletManager = {
         document.body.appendChild(guideBox);
     },
 
-    // 使用WalletConnect连接
-    connectWithWalletConnect: async function() {
+    // 使用MetaMask SDK连接
+    connectWithMetaMaskSDK: async function() {
         try {
-            console.log('尝试使用WalletConnect连接...');
+            console.log('尝试使用MetaMask SDK连接...');
+
+            // 检查SDK是否可用
+            if (!this.canUseMetaMaskSDK()) {
+                throw new Error('MetaMask SDK未初始化或不可用');
+            }
 
             // 创建加载中提示
             const loadingDiv = document.createElement('div');
-            loadingDiv.id = 'wallet-connect-loading';
+            loadingDiv.id = 'metamask-sdk-loading';
             loadingDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.8); color: white; padding: 20px; border-radius: 10px; z-index: 10000; text-align: center;';
-            loadingDiv.innerHTML = '<div style="margin-bottom: 15px;">正在加载WalletConnect...</div><div class="spinner" style="border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top: 4px solid white; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto;"></div>';
+            loadingDiv.innerHTML = '<div style="margin-bottom: 15px;">正在连接MetaMask...</div><div class="spinner" style="border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top: 4px solid white; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto;"></div><div style="margin-top: 15px; font-size: 12px;">请在MetaMask应用中确认连接请求</div>';
 
             // 添加旋转动画样式
             if (!document.getElementById('spinner-style')) {
@@ -954,6 +1034,386 @@ const WalletManager = {
 
             document.body.appendChild(loadingDiv);
 
+            // 设置超时，防止加载提示一直显示
+            const loadingTimeout = setTimeout(function() {
+                // 检查加载提示是否仍然存在
+                if (document.body.contains(loadingDiv)) {
+                    // 更新加载提示内容，提示用户可能出现问题
+                    loadingDiv.querySelector('div:first-child').textContent = '连接似乎有些问题...';
+                    loadingDiv.querySelector('div:nth-child(3)').textContent = '请检查MetaMask应用是否已打开，或点击下方按钮取消';
+
+                    // 添加取消按钮
+                    const cancelButton = document.createElement('button');
+                    cancelButton.textContent = '取消连接';
+                    cancelButton.style.cssText = 'margin-top: 15px; background-color: #e74c3c; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer;';
+                    cancelButton.onclick = function() {
+                        if (document.body.contains(loadingDiv)) {
+                            document.body.removeChild(loadingDiv);
+                        }
+                    };
+                    loadingDiv.appendChild(cancelButton);
+                }
+            }, 10000); // 10秒后更新提示
+
+            try {
+                // 使用MetaMask SDK连接
+                const success = await MetaMaskSDKManager.connect();
+
+                // 清除超时
+                clearTimeout(loadingTimeout);
+
+                if (success) {
+                    console.log('MetaMask SDK连接成功');
+
+                    // 获取账户和链ID
+                    const account = MetaMaskSDKManager.getAccount();
+                    const chainId = MetaMaskSDKManager.getChainId();
+
+                    // 更新钱包管理器状态
+                    this.account = account;
+                    this.chainId = chainId;
+                    this.web3 = new Web3(MetaMaskSDKManager.ethereum);
+                    this.provider = MetaMaskSDKManager.ethereum;
+
+                    // 清除断开连接标志
+                    this.manuallyDisconnected = false;
+                    localStorage.removeItem('wallet_manually_disconnected');
+
+                    // 保存连接状态
+                    localStorage.setItem('wallet_connected', 'true');
+                    localStorage.setItem('wallet_account', account);
+                    localStorage.setItem('wallet_provider', 'metamask_sdk');
+
+                    // 确保游戏容器可见
+                    const container = document.getElementById('container');
+                    if (container && container.style.display === 'none') {
+                        console.log('连接MetaMask SDK后显示游戏容器');
+                        container.style.display = 'block';
+                    }
+
+                    // 确保所有canvas元素可见
+                    document.querySelectorAll('canvas').forEach(function(canvas) {
+                        canvas.style.display = 'block';
+                        console.log('Canvas元素已设置为可见:', canvas);
+                    });
+
+                    // 移除加载提示
+                    if (document.body.contains(loadingDiv)) {
+                        document.body.removeChild(loadingDiv);
+                    }
+
+                    return true;
+                } else {
+                    throw new Error('MetaMask SDK连接失败');
+                }
+            } catch (error) {
+                // 清除超时
+                clearTimeout(loadingTimeout);
+
+                // 移除加载提示
+                if (document.body.contains(loadingDiv)) {
+                    document.body.removeChild(loadingDiv);
+                }
+
+                throw error;
+            }
+        } catch (error) {
+            console.error('连接MetaMask SDK失败:', error);
+            alert('连接MetaMask失败: ' + (error.message || '未知错误') + '\n\n请确保已安装MetaMask应用，并允许连接请求。');
+            return false;
+        }
+    },
+
+    // 使用imToken钱包连接
+    connectWithImToken: async function() {
+        try {
+            console.log('尝试使用imToken钱包连接...');
+
+            // 检查ImTokenConnector是否可用
+            if (typeof ImTokenConnector === 'undefined') {
+                throw new Error('ImTokenConnector未定义，请确保已引入相关脚本');
+            }
+
+            // 使用ImTokenConnector连接
+            const success = await ImTokenConnector.connect();
+
+            if (success) {
+                console.log('imToken连接流程启动成功');
+                return true;
+            } else {
+                throw new Error('imToken连接流程启动失败');
+            }
+        } catch (error) {
+            console.error('连接imToken钱包失败:', error);
+            alert('连接imToken钱包失败: ' + (error.message || '未知错误') + '\n\n请确保已安装imToken应用，或尝试使用其他连接方式。');
+            return false;
+        }
+    },
+
+    // 使用简化版WalletConnect连接
+    connectWithSimpleWalletConnect: async function() {
+        try {
+            console.log('尝试使用简化版WalletConnect连接...');
+
+            // 检查SimpleWalletConnect是否可用
+            if (typeof SimpleWalletConnect === 'undefined') {
+                throw new Error('SimpleWalletConnect未定义，请确保已引入相关脚本');
+            }
+
+            // 使用SimpleWalletConnect连接
+            const success = await SimpleWalletConnect.connect();
+
+            if (success) {
+                console.log('SimpleWalletConnect连接成功');
+                return true;
+            } else {
+                throw new Error('SimpleWalletConnect连接失败');
+            }
+        } catch (error) {
+            console.error('连接SimpleWalletConnect失败:', error);
+            alert('连接WalletConnect失败: ' + (error.message || '未知错误') + '\n\n请确保已安装WalletConnect相关依赖，或尝试刷新页面后重试。');
+            return false;
+        }
+    },
+
+    // 处理WalletConnect连接成功
+    handleWalletConnectSuccess: function(provider, account, chainId) {
+        console.log('处理WalletConnect连接成功:', account, chainId);
+
+        // 设置提供商和Web3
+        this.provider = provider;
+        this.web3 = new Web3(provider);
+
+        // 设置账户和链ID
+        this.account = account;
+        this.chainId = chainId;
+
+        // 清除断开连接标志
+        this.manuallyDisconnected = false;
+        localStorage.removeItem('wallet_manually_disconnected');
+
+        // 保存连接状态
+        localStorage.setItem('wallet_connected', 'true');
+        localStorage.setItem('wallet_account', account);
+        localStorage.setItem('wallet_provider', 'walletconnect');
+
+        // 确保游戏容器可见
+        const container = document.getElementById('container');
+        if (container && container.style.display === 'none') {
+            console.log('连接WalletConnect后显示游戏容器');
+            container.style.display = 'block';
+        }
+
+        // 确保所有canvas元素可见
+        document.querySelectorAll('canvas').forEach(function(canvas) {
+            canvas.style.display = 'block';
+            canvas.style.visibility = 'visible';
+            canvas.style.opacity = '1';
+            console.log('Canvas元素已设置为可见:', canvas);
+        });
+
+        // 强制刷新Canvas
+        setTimeout(function() {
+            document.querySelectorAll('canvas').forEach(function(canvas) {
+                // 尝试触发重绘
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(0, 0, 1, 1);
+                    console.log('Canvas已重绘');
+                }
+            });
+        }, 500);
+
+        // 尝试修复移动设备黑屏问题
+        if (typeof MobileScreenFix !== 'undefined') {
+            setTimeout(function() {
+                MobileScreenFix.checkAndFixBlackScreen();
+            }, 1000);
+        }
+
+        // 启动加载页面监控
+        if (typeof LoadingMonitor !== 'undefined') {
+            setTimeout(function() {
+                console.log('启动加载页面监控...');
+                LoadingMonitor.startMonitoring();
+            }, 1500);
+        }
+
+        return true;
+    },
+
+    // 处理imToken连接成功
+    handleImTokenSuccess: function(provider, account, chainId) {
+        console.log('处理imToken连接成功:', account, chainId);
+
+        // 设置提供商和Web3
+        this.provider = provider;
+        this.web3 = new Web3(provider);
+
+        // 设置账户和链ID
+        this.account = account;
+        this.chainId = chainId;
+
+        // 清除断开连接标志
+        this.manuallyDisconnected = false;
+        localStorage.removeItem('wallet_manually_disconnected');
+
+        // 保存连接状态
+        localStorage.setItem('wallet_connected', 'true');
+        localStorage.setItem('wallet_account', account);
+        localStorage.setItem('wallet_provider', 'imtoken');
+
+        // 确保游戏容器可见
+        const container = document.getElementById('container');
+        if (container) {
+            console.log('连接imToken后显示游戏容器');
+            container.style.display = 'block';
+            container.style.visibility = 'visible';
+            container.style.opacity = '1';
+            container.style.zIndex = '1';
+
+
+        }
+
+        // 确保所有canvas元素可见
+        document.querySelectorAll('canvas').forEach(function(canvas) {
+            canvas.style.display = 'block';
+            canvas.style.visibility = 'visible';
+            canvas.style.opacity = '1';
+
+
+
+
+            console.log('Canvas元素已设置为可见:', canvas);
+        });
+
+        // 强制刷新Canvas
+        setTimeout(function() {
+            document.querySelectorAll('canvas').forEach(function(canvas) {
+                // 尝试触发重绘
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(0, 0, 1, 1);
+                    console.log('Canvas已重绘');
+                }
+            });
+        }, 500);
+
+
+
+
+
+        return true;
+    },
+
+
+
+    // 使用WalletConnect连接
+    connectWithWalletConnect: async function() {
+        try {
+            console.log('尝试使用WalletConnect连接...');
+
+            // 创建加载中提示
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'wallet-connect-loading';
+            loadingDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.8); color: white; padding: 20px; border-radius: 10px; z-index: 10000; text-align: center;';
+            loadingDiv.innerHTML = '<div style="margin-bottom: 15px;">正在加载WalletConnect...</div><div class="spinner" style="border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top: 4px solid white; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto;"></div><div style="margin-top: 15px; font-size: 12px;">如果长时间未响应，请点击下方按钮取消</div><button id="show-qr-code-button" style="margin-top: 10px; margin-right: 5px; background-color: #3b99fc; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 14px;">直接显示二维码</button><button id="cancel-wallet-connect" style="margin-top: 10px; background-color: #e74c3c; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 14px;">取消连接</button>';
+
+            // 添加旋转动画样式
+            if (!document.getElementById('spinner-style')) {
+                const style = document.createElement('style');
+                style.id = 'spinner-style';
+                style.textContent = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
+                document.head.appendChild(style);
+            }
+
+            document.body.appendChild(loadingDiv);
+
+            // 添加直接显示二维码按钮事件
+            document.getElementById('show-qr-code-button').addEventListener('click', async () => {
+                console.log('用户点击了直接显示二维码按钮');
+
+                try {
+                    // 创建WalletConnect提供商
+                    console.log('创建WalletConnect提供商...');
+
+                    // 检查全局变量
+                    let provider;
+                    if (typeof window.WalletConnectProvider !== 'undefined') {
+                        console.log('使用全局WalletConnectProvider变量');
+
+                        // 检查是否需要使用default属性
+                        let ProviderClass = window.WalletConnectProvider;
+                        if (ProviderClass.default) {
+                            ProviderClass = ProviderClass.default;
+                            console.log('使用WalletConnectProvider.default');
+                        }
+
+                        // 创建提供商
+                        provider = new ProviderClass({
+                            rpc: {
+                                1: 'https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161', // 以太坊主网
+                                56: 'https://bsc-dataseed.binance.org/', // BSC主网
+                                97: 'https://data-seed-prebsc-1-s1.binance.org:8545/' // BSC测试网
+                            },
+                            bridge: 'https://bridge.walletconnect.org',
+                            qrcodeModal: window.WalletConnectQRCodeModal
+                        });
+
+                        // 移除加载提示
+                        if (document.body.contains(loadingDiv)) {
+                            document.body.removeChild(loadingDiv);
+                        }
+
+                        // 创建连接器
+                        if (provider._walletConnector) {
+                            // 获取URI
+                            const uri = provider._walletConnector.uri;
+                            if (uri) {
+                                console.log('获取到URI:', uri);
+                                // 显示自定义二维码
+                                this.showCustomQRCode(uri);
+                            } else {
+                                console.error('无法获取URI');
+                                alert('无法获取连接URI，请尝试其他连接方式');
+                            }
+                        } else {
+                            console.error('无法获取WalletConnector');
+                            alert('无法初始化WalletConnect，请尝试其他连接方式');
+                        }
+                    } else {
+                        console.error('WalletConnectProvider未定义');
+                        alert('WalletConnect库未加载，请刷新页面重试');
+                    }
+                } catch (error) {
+                    console.error('显示二维码时出错:', error);
+                    alert('显示二维码时出错: ' + (error.message || '未知错误'));
+                }
+            });
+
+            // 添加取消按钮事件
+            document.getElementById('cancel-wallet-connect').addEventListener('click', () => {
+                // 移除加载提示
+                if (document.body.contains(loadingDiv)) {
+                    document.body.removeChild(loadingDiv);
+                }
+
+                // 抛出用户取消错误
+                throw new Error('用户取消了连接');
+            });
+
+            // 设置超时，防止加载提示一直显示
+            const loadingTimeout = setTimeout(() => {
+                // 检查加载提示是否仍然存在
+                if (document.body.contains(loadingDiv)) {
+                    // 更新加载提示内容，提示用户可能出现问题
+                    loadingDiv.querySelector('div:first-child').textContent = '连接似乎有些问题...';
+                    loadingDiv.querySelector('div:nth-child(3)').textContent = '请检查您的网络连接，或点击下方按钮取消';
+                }
+            }, 10000); // 10秒后更新提示
+
             try {
                 // 检查是否已经加载了WalletConnect库
                 let WalletConnectProvider, QRCodeModal;
@@ -962,30 +1422,39 @@ const WalletManager = {
                 if (typeof window.WalletConnectProvider === 'undefined' || typeof window.WalletConnectQRCodeModal === 'undefined') {
                     console.log('WalletConnect库未加载，开始动态加载...');
 
-                    // 动态加载WalletConnect脚本
+                    // 动态加载WalletConnect脚本，添加超时处理
                     await new Promise((resolve, reject) => {
+                        // 设置超时处理，防止无限等待
+                        const timeout = setTimeout(() => {
+                            console.error('加载WalletConnect库超时');
+                            reject(new Error('加载WalletConnect库超时，请检查网络连接后重试'));
+                        }, 15000); // 15秒超时
+
                         // 加载WalletConnect Provider
                         const wcScript = document.createElement('script');
-                        wcScript.src = 'https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js';
+                        wcScript.src = 'https://unpkg.com/@walletconnect/web3-provider@1.7.8/dist/umd/index.min.js';
                         wcScript.onload = () => {
                             console.log('WalletConnect Provider 加载成功');
 
                             // 加载QR Code Modal
                             const qrScript = document.createElement('script');
-                            qrScript.src = 'https://cdn.jsdelivr.net/npm/@walletconnect/qrcode-modal@1.8.0/dist/umd/index.min.js';
+                            qrScript.src = 'https://unpkg.com/@walletconnect/qrcode-modal@1.7.8/dist/umd/index.min.js';
                             qrScript.onload = () => {
                                 console.log('WalletConnect QR Code Modal 加载成功');
+                                clearTimeout(timeout); // 清除超时
                                 resolve();
                             };
                             qrScript.onerror = (error) => {
+                                clearTimeout(timeout); // 清除超时
                                 console.error('加载WalletConnect QR Code Modal失败:', error);
-                                reject(new Error('加载WalletConnect QR Code Modal失败'));
+                                reject(new Error('加载WalletConnect QR Code Modal失败，请检查网络连接后重试'));
                             };
                             document.head.appendChild(qrScript);
                         };
                         wcScript.onerror = (error) => {
+                            clearTimeout(timeout); // 清除超时
                             console.error('加载WalletConnect Provider失败:', error);
-                            reject(new Error('加载WalletConnect Provider失败'));
+                            reject(new Error('加载WalletConnect Provider失败，请检查网络连接后重试'));
                         };
                         document.head.appendChild(wcScript);
                     });
@@ -1040,35 +1509,67 @@ const WalletManager = {
 
                 // 检查全局变量
                 let provider;
-                if (typeof window.WalletConnectProvider !== 'undefined') {
-                    console.log('使用全局WalletConnectProvider变量');
+                try {
+                    if (typeof window.WalletConnectProvider !== 'undefined') {
+                        console.log('使用全局WalletConnectProvider变量');
 
-                    // 检查是否需要使用default属性
-                    let ProviderClass = window.WalletConnectProvider;
-                    if (ProviderClass.default) {
-                        ProviderClass = ProviderClass.default;
-                        console.log('使用WalletConnectProvider.default');
-                    }
-
-                    provider = new ProviderClass({
-                        rpc: {
-                            1: 'https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161', // 以太坊主网
-                            56: 'https://bsc-dataseed.binance.org/', // BSC主网
-                            97: 'https://data-seed-prebsc-1-s1.binance.org:8545/' // BSC测试网
-                        },
-                        qrcodeModalOptions: {
-                            mobileLinks: [
-                                'metamask',
-                                'trust',
-                                'rainbow',
-                                'argent',
-                                'imtoken',
-                                'pillar'
-                            ]
+                        // 检查是否需要使用default属性
+                        let ProviderClass = window.WalletConnectProvider;
+                        if (ProviderClass.default) {
+                            ProviderClass = ProviderClass.default;
+                            console.log('使用WalletConnectProvider.default');
                         }
-                    });
-                } else {
-                    throw new Error('WalletConnectProvider未定义，请刷新页面重试');
+
+                        // 更新加载提示
+                        loadingDiv.querySelector('div:first-child').textContent = '正在初始化WalletConnect...';
+
+                        provider = new ProviderClass({
+                            rpc: {
+                                1: 'https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161', // 以太坊主网
+                                56: 'https://bsc-dataseed.binance.org/', // BSC主网
+                                97: 'https://data-seed-prebsc-1-s1.binance.org:8545/' // BSC测试网
+                            },
+                            bridge: 'https://bridge.walletconnect.org',
+                            // 备用bridge服务器
+                            // bridge: 'https://wallet-connect-bridge.binance.org/',
+                            // bridge: 'https://bridge.myhostedserver.com',
+                            qrcodeModal: window.WalletConnectQRCodeModal, // 明确指定QR码模态框
+                            qrcodeModalOptions: {
+                                mobileLinks: [
+                                    'metamask',
+                                    'trust',
+                                    'rainbow',
+                                    'argent',
+                                    'imtoken',
+                                    'pillar'
+                                ],
+                                desktopLinks: [
+                                    'metamask',
+                                    'trust',
+                                    'rainbow',
+                                    'argent'
+                                ]
+                            },
+                            // 添加超时设置
+                            connectTimeout: 30000 // 30秒超时
+                        });
+
+                        // 确保QR码模态框可用
+                        if (!window.WalletConnectQRCodeModal) {
+                            console.warn('WalletConnectQRCodeModal未找到，尝试使用备用方法');
+                            // 尝试使用备用方法
+                            if (typeof QRCodeModal !== 'undefined') {
+                                provider.qrcodeModal = QRCodeModal;
+                            }
+                        }
+
+                        console.log('WalletConnect提供商创建成功');
+                    } else {
+                        throw new Error('WalletConnectProvider未定义，请刷新页面重试');
+                    }
+                } catch (error) {
+                    console.error('创建WalletConnect提供商时出错:', error);
+                    throw new Error('创建WalletConnect提供商失败: ' + (error.message || '未知错误'));
                 }
 
                 // 保存提供商引用
@@ -1076,8 +1577,128 @@ const WalletManager = {
 
                 // 启用会话（显示二维码）
                 console.log('启用WalletConnect会话...');
-                await provider.enable();
-                console.log('WalletConnect会话已启用');
+
+                // 更新加载提示
+                loadingDiv.querySelector('div:first-child').textContent = '请在钱包中扫描二维码...';
+                loadingDiv.querySelector('div:nth-child(3)').textContent = '如果没有显示二维码，请点击下方按钮取消并重试';
+
+                try {
+                    // 设置一个超时，如果用户长时间未扫描二维码
+                    const enableTimeout = setTimeout(() => {
+                        // 检查加载提示是否仍然存在
+                        if (document.body.contains(loadingDiv)) {
+                            // 更新加载提示内容
+                            loadingDiv.querySelector('div:first-child').textContent = '等待扫描超时...';
+                            loadingDiv.querySelector('div:nth-child(3)').textContent = '请确认您已扫描并确认连接，或点击下方按钮取消';
+                        }
+                    }, 30000); // 30秒后更新提示
+
+                    // 确保QR码模态框可用
+                    if (!provider.qrcodeModal && window.WalletConnectQRCodeModal) {
+                        console.log('手动设置QR码模态框');
+                        provider.qrcodeModal = window.WalletConnectQRCodeModal;
+                    }
+
+                    // 检查是否在移动设备上
+                    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                    console.log('是否在移动设备上:', isMobile);
+
+                    // 如果在移动设备上，尝试使用URI而不是二维码
+                    if (isMobile && provider.connector && provider.connector.uri) {
+                        // 检查URI格式是否正确
+                        const uri = provider.connector.uri;
+                        console.log('在移动设备上使用URI:', uri);
+
+                        // 检查URI是否有效
+                        if (uri && uri.startsWith('wc:') && uri.length > 5) {
+                            try {
+                                // 尝试使用多种方式打开URI
+
+                                // 方式1：使用window.location.href
+                                // 创建一个隐藏的iframe来尝试打开URI
+                                const iframe = document.createElement('iframe');
+                                iframe.style.display = 'none';
+                                iframe.src = uri;
+                                document.body.appendChild(iframe);
+
+                                // 方式2：使用window.open
+                                setTimeout(() => {
+                                    try {
+                                        window.open(uri, '_blank');
+                                    } catch (e) {
+                                        console.error('使用window.open打开URI失败:', e);
+                                    }
+                                }, 500);
+
+                                // 方式3：最后尝试直接跳转
+                                setTimeout(() => {
+                                    try {
+                                        window.location.href = uri;
+                                    } catch (e) {
+                                        console.error('使用location.href打开URI失败:', e);
+                                    }
+                                }, 1000);
+                            } catch (e) {
+                                console.error('尝试打开URI失败:', e);
+                            }
+                        } else {
+                            console.warn('URI格式不正确或为空:', uri);
+                        }
+
+                        // 等待一段时间后继续
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
+
+                    // 启用WalletConnect会话
+                    await provider.enable();
+
+                    // 如果在移动设备上且有URI，但enable后仍未连接，再次尝试打开URI
+                    if (isMobile && provider.connector && provider.connector.uri && !provider.connected) {
+                        console.log('再次尝试使用URI:', provider.connector.uri);
+                        window.location.href = provider.connector.uri;
+
+                        // 等待一段时间后继续
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
+
+                    // 始终显示自定义二维码，确保用户能看到
+                    if (provider.connector && provider.connector.uri) {
+                        console.log('显示自定义二维码，确保用户能看到');
+
+                        // 先检查是否已经显示了自定义二维码
+                        if (!document.getElementById('custom-qrcode-container')) {
+                            // 延迟一点显示自定义二维码，给官方QR码模态框一个显示的机会
+                            setTimeout(() => {
+                                // 再次检查是否已经显示了自定义二维码
+                                if (!document.getElementById('custom-qrcode-container')) {
+                                    // 检查页面上是否有WalletConnect模态框
+                                    const hasQRCodeModal = document.querySelector('.walletconnect-qrcode');
+
+                                    // 如果没有任何二维码显示，则显示自定义二维码
+                                    if (!hasQRCodeModal) {
+                                        console.log('未检测到任何二维码模态框，显示自定义二维码');
+                                        this.showCustomQRCode(provider.connector.uri);
+                                    } else {
+                                        console.log('检测到WalletConnect二维码模态框，不显示自定义二维码');
+                                    }
+                                }
+                            }, 1000);
+                        }
+                    } else {
+                        console.warn('没有可用的URI，无法显示二维码');
+                    }
+
+                    // 清除超时
+                    clearTimeout(enableTimeout);
+
+                    console.log('WalletConnect会话已启用');
+
+                    // 更新加载提示
+                    loadingDiv.querySelector('div:first-child').textContent = '连接成功，正在初始化...';
+                } catch (error) {
+                    console.error('启用WalletConnect会话失败:', error);
+                    throw new Error('启用WalletConnect会话失败: ' + (error.message || '未知错误'));
+                }
 
                 // 初始化Web3
                 this.web3 = new Web3(provider);
@@ -1147,6 +1768,9 @@ const WalletManager = {
                         });
                     }, 500);
 
+                    // 清除超时
+                    clearTimeout(loadingTimeout);
+
                     // 移除加载提示
                     if (document.body.contains(loadingDiv)) {
                         document.body.removeChild(loadingDiv);
@@ -1158,6 +1782,9 @@ const WalletManager = {
                 }
             } catch (error) {
                 console.error('WalletConnect连接过程中出错:', error);
+
+                // 清除超时
+                clearTimeout(loadingTimeout);
 
                 // 移除加载提示
                 if (document.body.contains(loadingDiv)) {
@@ -1171,6 +1798,139 @@ const WalletManager = {
             alert('连接WalletConnect失败: ' + (error.message || '未知错误') + '\n\n请确保已安装WalletConnect相关依赖，或尝试刷新页面后重试。');
             return false;
         }
+    },
+
+    // 显示自定义二维码
+    showCustomQRCode: function(uri) {
+        // 创建二维码容器
+        const qrCodeContainer = document.createElement('div');
+        qrCodeContainer.id = 'custom-qrcode-container';
+        qrCodeContainer.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 10000;';
+
+        // 创建二维码内容
+        const qrCodeContent = document.createElement('div');
+        qrCodeContent.style.cssText = 'background-color: white; padding: 20px; border-radius: 10px; text-align: center; max-width: 90%; width: 350px;';
+
+        // 创建标题
+        const title = document.createElement('h3');
+        title.textContent = '使用WalletConnect扫描';
+        title.style.cssText = 'margin-top: 0; color: #3b99fc; font-size: 18px;';
+
+        // 创建说明
+        const description = document.createElement('p');
+        description.textContent = '请使用支持WalletConnect的钱包扫描下方二维码';
+        description.style.cssText = 'margin-bottom: 15px; color: #333;';
+
+        // 创建二维码图像
+        const qrCodeImage = document.createElement('div');
+        qrCodeImage.id = 'qrcode-image';
+        qrCodeImage.style.cssText = 'width: 250px; height: 250px; margin: 0 auto 15px auto; background-color: white;';
+
+        // 创建URI文本
+        const uriText = document.createElement('div');
+        uriText.textContent = uri;
+        uriText.style.cssText = 'word-break: break-all; font-size: 12px; color: #666; margin-bottom: 15px; background-color: #f5f5f5; padding: 10px; border-radius: 5px; text-align: left;';
+
+        // 创建复制按钮
+        const copyButton = document.createElement('button');
+        copyButton.textContent = '复制链接';
+        copyButton.style.cssText = 'background-color: #3b99fc; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 10px; width: 100%;';
+
+        // 添加复制按钮事件
+        copyButton.onclick = function() {
+            // 使用现代Clipboard API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(uri)
+                    .then(() => {
+                        alert('链接已复制到剪贴板');
+                    })
+                    .catch(err => {
+                        console.error('使用Clipboard API复制失败:', err);
+                        // 回退到传统方法
+                        fallbackCopy();
+                    });
+            } else {
+                // 回退到传统方法
+                fallbackCopy();
+            }
+
+            // 传统复制方法
+            function fallbackCopy() {
+                // 创建临时输入框
+                const tempInput = document.createElement('input');
+                tempInput.value = uri;
+                tempInput.style.position = 'absolute';
+                tempInput.style.left = '-9999px';
+                document.body.appendChild(tempInput);
+                tempInput.select();
+
+                // 复制文本
+                try {
+                    // 虽然已弃用，但作为后备方案仍然有用
+                    const success = document.execCommand('copy');
+                    if (success) {
+                        alert('链接已复制到剪贴板');
+                    } else {
+                        alert('复制失败，请手动复制链接');
+                    }
+                } catch (err) {
+                    console.error('复制失败:', err);
+                    alert('复制失败，请手动复制链接');
+                }
+
+                // 移除临时输入框
+                document.body.removeChild(tempInput);
+            }
+        };
+
+        // 创建关闭按钮
+        const closeButton = document.createElement('button');
+        closeButton.textContent = '关闭';
+        closeButton.style.cssText = 'background-color: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%;';
+
+        // 添加关闭按钮事件
+        closeButton.onclick = function() {
+            document.body.removeChild(qrCodeContainer);
+        };
+
+        // 组装二维码内容
+        qrCodeContent.appendChild(title);
+        qrCodeContent.appendChild(description);
+        qrCodeContent.appendChild(qrCodeImage);
+        qrCodeContent.appendChild(uriText);
+        qrCodeContent.appendChild(copyButton);
+        qrCodeContent.appendChild(closeButton);
+
+        // 添加二维码内容到容器
+        qrCodeContainer.appendChild(qrCodeContent);
+
+        // 添加到页面
+        document.body.appendChild(qrCodeContainer);
+
+        // 动态加载QRCode.js库
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js';
+        script.onload = function() {
+            // 生成二维码
+            if (window.QRCode) {
+                new window.QRCode(document.getElementById('qrcode-image'), {
+                    text: uri,
+                    width: 250,
+                    height: 250,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: window.QRCode.CorrectLevel.H
+                });
+            } else {
+                console.error('QRCode库加载失败');
+                document.getElementById('qrcode-image').textContent = '二维码生成失败，请使用复制链接功能';
+            }
+        };
+        script.onerror = function() {
+            console.error('加载QRCode库失败');
+            document.getElementById('qrcode-image').textContent = '二维码生成失败，请使用复制链接功能';
+        };
+        document.head.appendChild(script);
     },
 
     // 显示断开连接指导
@@ -1714,11 +2474,39 @@ const WalletManager = {
             // 强制刷新Canvas
             setTimeout(function() {
                 document.querySelectorAll('canvas').forEach(function(canvas) {
+                    // 确保Canvas尺寸正确
+                    if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+                        canvas.width = window.innerWidth;
+                        canvas.height = window.innerHeight;
+                        console.log('游戏启动时Canvas尺寸已调整为', canvas.width, 'x', canvas.height);
+                    }
+
+                    // 确保Canvas样式正确
+                    canvas.style.display = 'block';
+                    canvas.style.visibility = 'visible';
+                    canvas.style.opacity = '1';
+                    canvas.style.position = 'fixed';
+                    canvas.style.top = '0';
+                    canvas.style.left = '0';
+                    canvas.style.width = '100%';
+                    canvas.style.height = '100%';
+
                     // 尝试触发重绘
                     const ctx = canvas.getContext('2d');
                     if (ctx) {
+                        // 保存当前状态
+                        ctx.save();
+
+                        // 清除整个Canvas
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                        // 绘制黑色背景
                         ctx.fillStyle = '#000000';
-                        ctx.fillRect(0, 0, 1, 1);
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                        // 恢复状态
+                        ctx.restore();
+
                         console.log('游戏启动时Canvas已重绘');
                     }
                 });
@@ -1731,11 +2519,32 @@ const WalletManager = {
                         const canvas = document.createElement('canvas');
                         canvas.width = window.innerWidth;
                         canvas.height = window.innerHeight;
+
+                        // 设置Canvas样式
                         canvas.style.display = 'block';
+                        canvas.style.visibility = 'visible';
+                        canvas.style.opacity = '1';
+                        canvas.style.position = 'fixed';
+                        canvas.style.top = '0';
+                        canvas.style.left = '0';
+                        canvas.style.width = '100%';
+                        canvas.style.height = '100%';
+                        canvas.style.zIndex = '2';
+
+                        // 添加到容器
                         container.appendChild(canvas);
                         console.log('已创建新的Canvas元素');
+
+                        // 绘制黑色背景
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                            ctx.fillStyle = '#000000';
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        }
                     }
                 }
+
+
             }, 500);
 
             // 更新游戏状态面板

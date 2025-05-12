@@ -519,8 +519,16 @@ const WalletGameIntegration = {
                     // 尝试从API获取当前用户数据
                     console.log('尝试从API获取当前用户数据...');
 
-                    // 这里我们直接打印，不等待异步结果，因为onGameOver会处理实际的数据更新
-                    ApiService.getUserData(walletAddress)
+                    // 确保ApiService正确初始化
+                    if (window.ApiService && typeof window.ApiService.getUserData === 'function') {
+                        // 强制设置为9001端口
+                        if (window.ApiService.setBaseUrl) {
+                            window.ApiService.setBaseUrl('http://localhost:9001');
+                            console.log('游戏结束时强制设置API端点为http://localhost:9001');
+                        }
+
+                        // 这里我们直接打印，不等待异步结果，因为onGameOver会处理实际的数据更新
+                        ApiService.getUserData(walletAddress)
                         .then(userData => {
                             if (userData) {
                                 console.log('当前用户数据:', userData);
@@ -541,6 +549,10 @@ const WalletGameIntegration = {
                         .catch(error => {
                             console.error('获取用户数据时出错:', error);
                         });
+                    } else {
+                        console.error('ApiService不可用，无法获取用户数据');
+                        console.error('请确保api-service.js已正确加载，并且后端服务器正在运行');
+                    }
                 } catch (e) {
                     console.error('尝试获取用户数据时出错:', e);
                 }

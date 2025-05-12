@@ -1,0 +1,83 @@
+
+play1.png
+size: 4096,1024
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+1
+  rotate: false
+  xy: 1, 412
+  size: 101, 100
+  orig: 101, 100
+  offset: 0, 0
+  index: -1
+2
+  rotate: false
+  xy: 1, 616
+  size: 100, 100
+  orig: 100, 100
+  offset: 0, 0
+  index: -1
+3
+  rotate: false
+  xy: 1, 243
+  size: 167, 167
+  orig: 167, 167
+  offset: 0, 0
+  index: -1
+4
+  rotate: false
+  xy: 1, 718
+  size: 171, 72
+  orig: 171, 72
+  offset: 0, 0
+  index: -1
+5
+  rotate: false
+  xy: 103, 616
+  size: 168, 72
+  orig: 168, 72
+  offset: 0, 0
+  index: -1
+6
+  rotate: false
+  xy: 1, 514
+  size: 101, 100
+  orig: 101, 100
+  offset: 0, 0
+  index: -1
+7
+  rotate: false
+  xy: 104, 412
+  size: 168, 72
+  orig: 168, 72
+  offset: 0, 0
+  index: -1
+8
+  rotate: false
+  xy: 104, 486
+  size: 168, 72
+  orig: 168, 72
+  offset: 0, 0
+  index: -1
+9
+  rotate: false
+  xy: 170, 243
+  size: 168, 72
+  orig: 168, 72
+  offset: 0, 0
+  index: -1
+10
+  rotate: false
+  xy: 170, 317
+  size: 168, 72
+  orig: 168, 72
+  offset: 0, 0
+  index: -1
+text_0
+  rotate: false
+  xy: 1, 1
+  size: 495, 240
+  orig: 512, 256
+  offset: 7, 9
+  index: -1

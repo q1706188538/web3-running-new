@@ -27,7 +27,7 @@ const GameConfig = {
         TOKEN_NAME: "TWB",
 
         // 兑换比例：多少游戏金币兑换1个代币
-        COINS_PER_TOKEN: 1000,
+        COINS_PER_TOKEN: 100,
 
         // 最小兑换数量（代币）
         MIN_EXCHANGE_AMOUNT: 1,
@@ -35,17 +35,44 @@ const GameConfig = {
         // 最大兑换数量（代币）
         MAX_EXCHANGE_AMOUNT: 1000,
 
-        // 兑换手续费（百分比）
-        EXCHANGE_FEE_PERCENT: 2,
+        // 兑换手续费（基点，100=1%）
+        EXCHANGE_FEE_PERCENT: 200, // 2%，与合约中的exchangeFeeRate=200一致
 
         // 代币合约地址
-        CONTRACT_ADDRESS: "0xeb246449b283f9a98933a32132bee0ba7a2fdce6",
+        CONTRACT_ADDRESS: "0x7C0ed0c6a454a2669B79a64476Ab0551630bA6C5",
 
         // 游戏服务器合约地址（用于验证签名）
-        GAME_SERVER_ADDRESS: "0xE628408B47918c17cf6B97dDfa2A27c9a1CF451d",
+        GAME_SERVER_ADDRESS: "0xE628408B47918c17cf6B97dDfa2A27c9a1CF451d", // 与服务器端使用的地址一致
 
         // 合约所在网络ID（1=主网，56=BSC主网，97=BSC测试网）
-        NETWORK_ID: 56
+        NETWORK_ID: 97 // 使用BSC测试网
+    },
+
+    // 代币充值相关配置
+    TOKEN_RECHARGE: {
+        // 代币名称
+        TOKEN_NAME: "TWB",
+
+        // 充值比例：1个代币可以充值多少游戏金币
+        COINS_PER_TOKEN: 100,
+
+        // 最小充值数量（代币）
+        MIN_RECHARGE_AMOUNT: 1,
+
+        // 最大充值数量（代币）
+        MAX_RECHARGE_AMOUNT: 1000,
+
+        // 充值手续费（直接百分比）
+        RECHARGE_FEE_PERCENT: 2, // 2%，设置充值金币税率为2%
+
+        // 代币合约地址（与兑换使用相同合约）
+        CONTRACT_ADDRESS: "0x7C0ed0c6a454a2669B79a64476Ab0551630bA6C5",
+
+        // 游戏服务器合约地址（用于验证签名）
+        GAME_SERVER_ADDRESS: "0xE628408B47918c17cf6B97dDfa2A27c9a1CF451d", // 与服务器端使用的地址一致
+
+        // 合约所在网络ID（1=主网，56=BSC主网，97=BSC测试网）
+        NETWORK_ID: 97 // 使用BSC测试网
     },
 
     // 初始化
@@ -60,10 +87,7 @@ const GameConfig = {
             WalletProgress.useApi = this.USE_API;
         }
 
-        // 如果存在ApiService，设置API基础URL
-        if (typeof ApiService !== 'undefined') {
-            ApiService.baseUrl = this.API_BASE_URL;
-        }
+        // 不再需要设置ApiService
 
         // 尝试设置游戏速度
         this.applyGameSpeed();

@@ -31331,15 +31331,15 @@ GEMIOLI.Play = function() {
 	B.back.x = 180;
 	B.back.y = 150;
 	B.top.addChild(B.back);
-	B.distanceText = GEMIOLI.Text.fromAtlas(60, "fonts/play/text.fnt", "atlases/play.atlas", GEMIOLI.Text.RIGHT_ALIGN, GEMIOLI.Text.RIGHT_ALIGN, GEMIOLI.Text.CENTER_ALIGN);
-	B.distanceText.x = 165;
-	B.distanceText.y = -56;
-	B.distanceText.offset = -16;
+	B.distanceText = GEMIOLI.Text.fromAtlas(50, "fonts/play1/text.fnt", "atlases/play1.atlas", GEMIOLI.Text.RIGHT_ALIGN, GEMIOLI.Text.RIGHT_ALIGN, GEMIOLI.Text.CENTER_ALIGN);
+	B.distanceText.x = 145;
+	B.distanceText.y = -75;
+	B.distanceText.offset = 2;
 	B.back.addChild(B.distanceText);
-	B.coinsText = GEMIOLI.Text.fromAtlas(60, "fonts/play/text.fnt", "atlases/play.atlas", GEMIOLI.Text.RIGHT_ALIGN, GEMIOLI.Text.RIGHT_ALIGN, GEMIOLI.Text.CENTER_ALIGN);
-	B.coinsText.x = 165;
-	B.coinsText.y = 84;
-	B.coinsText.offset = -16;
+	B.coinsText = GEMIOLI.Text.fromAtlas(50, "fonts/play1/text.fnt", "atlases/play1.atlas", GEMIOLI.Text.RIGHT_ALIGN, GEMIOLI.Text.RIGHT_ALIGN, GEMIOLI.Text.CENTER_ALIGN);
+	B.coinsText.x = 145;
+	B.coinsText.y = 63;
+	B.coinsText.offset = 2;
 	B.back.addChild(B.coinsText);
 	B.coin = GEMIOLI.AtlasQuad.fromRect(-35, -44, 70, 89, "atlases/play.atlas", "coin");
 	B.coin.x = -95;
@@ -31568,10 +31568,18 @@ GEMIOLI.Play.prototype.fadeMenu = function(c, b) {
 	a.menuFade = (c === undefined ? 0 : c);
 	a.menuVolume = (b === undefined ? 1 : b);
 	if (a.menuFade === 0) {
-		a.menu.volume = a.menuVolume;
-		if (a.menu.volume === 0) {
-			a.menu.stop();
-			a.menu = null
+		if (a.menu && typeof a.menu.volume !== 'undefined') { // 检查 a.menu 是否存在且有 volume 属性
+			a.menu.volume = a.menuVolume;
+			if (a.menu.volume === 0) {
+				if (typeof a.menu.stop === 'function') { // 检查 stop 方法是否存在
+					a.menu.stop();
+				}
+				a.menu = null;
+			}
+		} else {
+			console.warn("GEMIOLI.Play.fadeMenu: a.menu is not a valid sound object or lacks volume property. Skipping volume set/stop.");
+			// 如果 a.menu 无效，也应该将其设为 null，以避免后续问题
+			a.menu = null;
 		}
 	}
 };
@@ -32047,9 +32055,9 @@ GEMIOLI.Menu = function() {
 		GEMIOLI.Shop.show()
 	});
 	a.bottom.addChild(a.shop);
-	a.title1 = GEMIOLI.AtlasQuad.fromRect(-447, -158, 895, 317, "atlases/menu.atlas", "title1");
+	a.title1 = GEMIOLI.AtlasQuad.fromRect(-447, -58, 595, 217, "atlases/menu.atlas", "title1");
 	a.addChild(a.title1);
-	a.title2 = GEMIOLI.AtlasQuad.fromRect(-405, -114, 810, 228, "atlases/menu.atlas", "title2");
+	a.title2 = GEMIOLI.AtlasQuad.fromRect(-205, -54, 510, 128, "atlases/menu.atlas", "title2");
 	a.addChild(a.title2);
 	a.top = new GEMIOLI.DisplayObjectContainer();
 	a.addChild(a.top);
@@ -32728,12 +32736,12 @@ GEMIOLI.Score = function() {
 	a.scoreText.y = -250;
 	a.scoreText.offset = -10;
 	a.center.addChild(a.scoreText);
-	a.distanceText = GEMIOLI.Text.fromAtlas(100, "fonts/score/text.fnt", "atlases/score.atlas", GEMIOLI.Text.LEFT_ALIGN, GEMIOLI.Text.LEFT_ALIGN, GEMIOLI.Text.CENTER_ALIGN);
+	a.distanceText = GEMIOLI.Text.fromAtlas(50, "fonts/score/text.fnt", "atlases/score.atlas", GEMIOLI.Text.LEFT_ALIGN, GEMIOLI.Text.LEFT_ALIGN, GEMIOLI.Text.CENTER_ALIGN);
 	a.distanceText.x = 50;
 	a.distanceText.y = -40;
 	a.distanceText.offset = -15;
 	a.center.addChild(a.distanceText);
-	a.coinsText = GEMIOLI.Text.fromAtlas(100, "fonts/score/text.fnt", "atlases/score.atlas", GEMIOLI.Text.LEFT_ALIGN, GEMIOLI.Text.LEFT_ALIGN, GEMIOLI.Text.CENTER_ALIGN);
+	a.coinsText = GEMIOLI.Text.fromAtlas(50, "fonts/score/text.fnt", "atlases/score.atlas", GEMIOLI.Text.LEFT_ALIGN, GEMIOLI.Text.LEFT_ALIGN, GEMIOLI.Text.CENTER_ALIGN);
 	a.coinsText.x = 50;
 	a.coinsText.y = 95;
 	a.coinsText.offset = -15;
