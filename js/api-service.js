@@ -3,10 +3,13 @@
  * 用于与后端服务器通信，保存和获取用户数据
  */
 const ApiService = {
-    // API基础URL - 使用固定的9001端口
-    baseUrl: 'http://localhost:9001/api',
+    // API基础URL - 从环境变量读取，默认为本地开发地址
+    // !! 注意：process.env.API_BASE_URL 需要在构建或运行时设置 !!
+    //    生产环境应设置为 '/api' 以便通过 Nginx 代理
+    //    开发环境不设置，则使用默认值
+    baseUrl: (typeof process !== 'undefined' && process.env && process.env.API_BASE_URL) || 'http://localhost:9001/api',
 
-    // 设置API基础URL
+    // 设置API基础URL (保留，以防万一，但优先使用环境变量)
     setBaseUrl: function(url) {
         this.baseUrl = url;
         console.log('API基础URL已设置为:', url);
