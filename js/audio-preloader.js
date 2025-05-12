@@ -767,47 +767,7 @@ const AudioPreloader = {
             }
         };
 
-        // 定义内联的 async 尝试函数，以便访问 this.audioContext
-        const attemptResumeExistingContext = async () => {
-            if (this.audioContext.state === 'suspended') {
-                // console.log('Existing AudioContext is suspended, trying to resume...');
-                try {
-                    await this.audioContext.resume();
-                    // console.log('AudioContext resumed successfully via resume(). State:', this.audioContext.state);
-                    return this.audioContext.state === 'running'; // 确认状态
-                } catch (error) {
-                    console.error('Error resuming existing AudioContext:', error);
-                    return false;
-                }
-            } else if (this.audioContext.state === 'running') {
-                // console.log('Existing AudioContext is already running.');
-                return true;
-            }
-            // console.log('Existing AudioContext state is not suspended or running:', this.audioContext.state);
-            return false; // 其他状态（如 'closed'）
-        };
-
-        const tryRecreateContext = async () => {
-            // console.log('Attempting to create a new AudioContext as a fallback...');
-            try {
-                if (this.audioContext && typeof this.audioContext.close === 'function' && this.audioContext.state !== 'closed') {
-                    // console.log('Closing previous AudioContext before recreating. State:', this.audioContext.state);
-                    await this.audioContext.close().catch(e => console.warn('Error closing previous AudioContext:', e));
-                }
-                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                // console.log('New AudioContext created. Initial state:', this.audioContext.state);
-                if (this.audioContext.state === 'suspended') {
-                    // console.log('Newly created AudioContext is suspended, attempting resume...');
-                    await this.audioContext.resume();
-                    // console.log('Newly created AudioContext resumed. State:', this.audioContext.state);
-                }
-                return this.audioContext.state === 'running';
-            } catch (error) {
-                console.error('Error creating or resuming new AudioContext:', error);
-                this.audioContext = null;
-                return false;
-            }
-        };
+        // 重复的声明已被移除
 
         // 使用 async/await 执行尝试链
         let success = await attemptResumeExistingContext();
@@ -818,7 +778,12 @@ const AudioPreloader = {
 
         // console.log('Final unlock audio result:', success);
         return success; // 返回最终结果
-        /* }).then(finalSuccess => { // 原来的 Promise 链结尾，现在用 async/await 替代 */
+        // The following .then and .catch are remnants of a previous Promise-based implementation
+        // and are causing syntax errors with the current async/await structure.
+        // They are no longer needed as error handling is done within the async functions
+        // and the final result is returned directly.
+        /*
+        }).then(finalSuccess => {
             if (finalSuccess) {
                 // console.log('AudioContext should now be active and running.');
             } else {
@@ -828,6 +793,7 @@ const AudioPreloader = {
             // This catch is for errors in the promise chaining logic itself, though individual steps have their own catches.
             console.error('Critical error in AudioContext activation chain:', finalError);
         });
+        */
     }
 };
 
