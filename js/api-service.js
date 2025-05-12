@@ -3,27 +3,23 @@
  * 用于与后端服务器通信，保存和获取用户数据
  */
 const ApiService = {
-    // API基础URL - 从环境变量读取，默认为本地开发地址
-    // !! 注意：process.env.API_BASE_URL 需要在构建或运行时设置 !!
-    //    生产环境应设置为 '/api' 以便通过 Nginx 代理
-    //    开发环境不设置，则使用默认值
-    baseUrl: (typeof process !== 'undefined' && process.env && process.env.API_BASE_URL) || 'http://localhost:9001/api',
+    // API基础URL - 始终使用相对路径，由开发服务器或Nginx代理
+    baseUrl: '', // 留空或移除，下面直接构造相对路径
 
-    // 设置API基础URL (保留，以防万一，但优先使用环境变量)
+    // 设置API基础URL (保留，但不推荐使用，因为baseUrl现在应始终为空)
     setBaseUrl: function(url) {
         this.baseUrl = url;
         console.log('API基础URL已设置为:', url);
     },
 
-    // 构建API URL的辅助方法
+    // 构建API URL的辅助方法 - 始终返回 /api/... 相对路径
     buildApiUrl: function(path) {
-        // 如果baseUrl已经包含/api，则直接拼接路径
-        if (this.baseUrl.endsWith('/api')) {
-            return `${this.baseUrl}${path}`;
+        const apiPath = path.startsWith('/') ? path : `/${path}`;
+        // 确保最终路径以 /api/ 开头，避免重复
+        if (apiPath.startsWith('/api/')) {
+            return apiPath;
         }
-
-        // 否则，添加/api前缀
-        return `${this.baseUrl}/api${path}`;
+        return `/api${apiPath}`;
     },
 
     // 获取用户数据
@@ -317,12 +313,9 @@ const ApiService = {
     // 测试API连接
     testConnection: async function() {
         try {
-            // 强制使用9001端口
-            let testUrl = 'http://localhost:9001/health';
-
-            // 记录当前baseUrl，但不使用它
-            console.log('当前baseUrl:', this.baseUrl);
-            console.log('强制使用9001端口测试API连接，URL:', testUrl);
+            // 始终使用相对路径 /health
+            const testUrl = '/health';
+            console.log('测试API连接，URL:', testUrl);
 
             // 添加超时设置，避免长时间等待
             const controller = new AbortController();
@@ -378,15 +371,8 @@ const ApiService = {
 
         try {
             // 使用辅助方法构建API URL
-            // 注意：create-user-data端点不在/api路径下，而是在根路径下
-            let url = `/create-user-data/${walletAddress}`;
-
-            // 如果baseUrl是完整URL（包含http://），则使用相同的主机和端口
-            if (this.baseUrl.startsWith('http')) {
-                const urlParts = this.baseUrl.split('/');
-                const hostPort = urlParts[0] + '//' + urlParts[2]; // 例如 http://localhost:9001
-                url = hostPort + `/create-user-data/${walletAddress}`;
-            }
+            // 始终使用相对路径 /create-user-data/...
+            const url = `/create-user-data/${walletAddress}`;
 
             console.log('API请求URL:', url);
 
