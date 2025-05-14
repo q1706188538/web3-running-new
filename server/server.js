@@ -1093,12 +1093,12 @@ function isValidWalletAddress(address) {
 /**
  * 验证游戏数据校验码
  * POST /api/verify-game-data
- * 请求体: { walletAddress, gameCoins, verification }
+ * 请求体: { walletAddress, gameCoins, verification, gameScore, isNewHighScore }
  */
 app.post('/api/verify-game-data', (req, res) => {
     console.log('收到游戏数据验证请求:', req.body);
 
-    const { walletAddress, gameCoins, verification } = req.body;
+    const { walletAddress, gameCoins, verification, gameScore, isNewHighScore } = req.body;
 
     // 验证参数
     if (!walletAddress) {
@@ -1155,6 +1155,19 @@ app.post('/api/verify-game-data', (req, res) => {
         userData.highScore = (userData.highScore || 0) + gameCoins;
         console.log(`更新用户累计获得金币: ${userData.highScore}`);
 
+        // 更新最高得分（如果有）
+        if (gameScore !== undefined && gameScore > 0) {
+            const currentLastScore = userData.lastScore || 0;
+
+            // 如果是新的最高得分，或者当前得分高于历史最高得分
+            if (isNewHighScore || gameScore > currentLastScore) {
+                userData.lastScore = gameScore;
+                console.log(`更新用户最高得分: ${currentLastScore} -> ${gameScore}`);
+            } else {
+                console.log(`当前得分 ${gameScore} 不高于历史最高得分 ${currentLastScore}，不更新`);
+            }
+        }
+
         // 添加时间戳
         userData.lastUpdated = new Date().toISOString();
 
@@ -1166,7 +1179,8 @@ app.post('/api/verify-game-data', (req, res) => {
             success: true,
             coins: userData.coins,
             highScore: userData.highScore,
-            message: '校验成功，金币已更新'
+            lastScore: userData.lastScore || 0,
+            message: '校验成功，金币和得分已更新'
         });
     } catch (error) {
         console.error('验证游戏数据出错:', error);
