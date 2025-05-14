@@ -234,7 +234,6 @@ const WalletManager = {
         leaderboardBtn.id = 'leaderboard-btn';
         leaderboardBtn.className = 'wallet-button';
         leaderboardBtn.textContent = '排行榜';
-        // 统一使用与其他按钮一致的样式参数，并添加min-width和text-align
         leaderboardBtn.style.cssText = 'background-color: #1abc9c; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); transition: all 0.2s ease; min-width: 80px; text-align: center;';
 
         leaderboardBtn.addEventListener('mouseover', function() {
@@ -254,6 +253,42 @@ const WalletManager = {
             }
         });
         walletInfo.appendChild(leaderboardBtn); // 排行榜按钮
+
+        // 创建奖励池按钮
+        const rewardPoolBtn = document.createElement('button');
+        rewardPoolBtn.id = 'reward-pool-btn';
+        rewardPoolBtn.className = 'wallet-button';
+        rewardPoolBtn.textContent = '奖励池';
+        rewardPoolBtn.style.cssText = 'background-color: #e67e22; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: all 0.2s ease; min-width: 80px; text-align: center;';
+        rewardPoolBtn.addEventListener('mouseover', function() { this.style.backgroundColor = '#d35400'; this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.4)'; });
+        rewardPoolBtn.addEventListener('mouseout', function() { this.style.backgroundColor = '#e67e22'; this.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)'; });
+        rewardPoolBtn.addEventListener('click', function() {
+            if (typeof RewardPoolPanel !== 'undefined' && RewardPoolPanel.show) {
+                RewardPoolPanel.show();
+            } else {
+                console.error('RewardPoolPanel模块未加载或show方法不存在');
+                alert('奖励池功能暂时不可用');
+            }
+        });
+        walletInfo.appendChild(rewardPoolBtn);
+
+        // 创建资金池按钮
+        const fundingPoolBtn = document.createElement('button');
+        fundingPoolBtn.id = 'funding-pool-btn';
+        fundingPoolBtn.className = 'wallet-button';
+        fundingPoolBtn.textContent = '资金池';
+        fundingPoolBtn.style.cssText = 'background-color: #2ecc71; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: all 0.2s ease; min-width: 80px; text-align: center;';
+        fundingPoolBtn.addEventListener('mouseover', function() { this.style.backgroundColor = '#27ae60'; this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.4)'; });
+        fundingPoolBtn.addEventListener('mouseout', function() { this.style.backgroundColor = '#2ecc71'; this.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)'; });
+        fundingPoolBtn.addEventListener('click', function() {
+            if (typeof FundingPoolPanel !== 'undefined' && FundingPoolPanel.show) {
+                FundingPoolPanel.show();
+            } else {
+                console.error('FundingPoolPanel模块未加载或show方法不存在');
+                alert('资金池功能暂时不可用');
+            }
+        });
+        walletInfo.appendChild(fundingPoolBtn);
 
         walletInfo.appendChild(exchangeBtn);    // 兑换代币按钮
         walletInfo.appendChild(rechargeBtn);    // 充值金币按钮
