@@ -30,12 +30,23 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 // 中间件
-// 配置CORS，允许所有来源和所有请求头
+// 配置CORS，允许所有来源和所有请求头，并添加额外的响应头
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'Expires', '*']
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'Expires', '*'],
+    credentials: true
 }));
+
+// 添加额外的CORS和安全相关头
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Referrer-Policy', 'no-referrer-when-downgrade');
+    next();
+});
 
 // 解析JSON请求体
 app.use(bodyParser.json({
