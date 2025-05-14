@@ -104,8 +104,18 @@ const WalletGameIntegration = {
             let currentGameCoins = 0;
 
             try {
-                // 直接从GEMIOLI.Play获取本次游戏的分数和金币
-                currentGameScore = Math.floor(GEMIOLI.Play.distance);
+                // 尝试从GEMIOLI.Play.distanceText._cacheText获取本次游戏的分数
+                if (GEMIOLI.Play && GEMIOLI.Play.distanceText && GEMIOLI.Play.distanceText._cacheText) {
+                    // 从distanceText._cacheText获取分数，这是显示在界面上的实际距离值
+                    currentGameScore = parseInt(GEMIOLI.Play.distanceText._cacheText, 10);
+                    console.log('从GEMIOLI.Play.distanceText._cacheText获取分数:', currentGameScore);
+                } else {
+                    // 如果distanceText不可用，回退到使用distance
+                    currentGameScore = Math.floor(GEMIOLI.Play.distance);
+                    console.log('从GEMIOLI.Play.distance获取分数:', currentGameScore);
+                }
+
+                // 获取金币数量
                 currentGameCoins = GEMIOLI.Play.coins;
 
                 if (window.DEBUG_MODE) {
