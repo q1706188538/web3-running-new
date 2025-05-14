@@ -184,156 +184,38 @@ const MetaMaskManager = {
         const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
         const isAndroid = /Android/i.test(navigator.userAgent);
 
-        // 显示选择提示
-        const choiceDiv = document.createElement('div');
-        choiceDiv.id = 'metamask-choice';
-        choiceDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.8); color: white; padding: 20px; border-radius: 10px; z-index: 10000; text-align: center;';
-
-        // 根据设备类型显示不同的选项
-        let choiceHTML = '';
-
-        // 检测移动设备
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-        if (isMobile) {
-            // 移动设备选项
-            choiceHTML = `
-                <div style="margin-bottom: 15px;">请选择连接钱包的方式</div>
-                <div style="color: #3b99fc; font-size: 12px; margin-bottom: 10px;">推荐: 使用imToken钱包连接</div>
-                <button id="choice-imtoken" style="background-color: #3b99fc; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%; margin-bottom: 10px;">使用imToken钱包连接</button>
-                <div style="color: #3b99fc; font-size: 12px; margin-bottom: 10px;">或者: 使用WalletConnect连接其他钱包</div>
-                <button id="choice-static-walletconnect" style="background-color: #3b99fc; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%; margin-bottom: 10px;">使用WalletConnect连接</button>
-                <div style="color: #f5a623; font-size: 12px; margin-bottom: 10px;">或者: 如果您已安装MetaMask，可以尝试直接连接</div>
-                <button id="choice-primary" style="background-color: #f5a623; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%; margin-bottom: 10px;">直接打开MetaMask</button>
-            `;
-        } else {
-            // 桌面设备选项
-            choiceHTML = `
-                <div style="margin-bottom: 15px;">请选择连接钱包的方式</div>
-                <div style="color: #3b99fc; font-size: 12px; margin-bottom: 10px;">推荐: 使用WalletConnect连接，兼容性更好</div>
-                <button id="choice-static-walletconnect" style="background-color: #3b99fc; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%; margin-bottom: 10px;">使用WalletConnect连接</button>
-                <div style="color: #f5a623; font-size: 12px; margin-bottom: 10px;">或者: 如果您已安装MetaMask，可以尝试直接连接</div>
-                <button id="choice-primary" style="background-color: #f5a623; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%; margin-bottom: 10px;">直接打开MetaMask</button>
-            `;
-        }
-
-        // 为Android设备添加Intent选项
-        if (isAndroid) {
-            choiceHTML += `
-                <button id="choice-android" style="background-color: #3b99fc; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%; margin-bottom: 10px;">方式2: Android专用方式</button>
-            `;
-        }
-
-        // 为iOS设备添加专用选项
-        if (isIOS) {
-            choiceHTML += `
-                <button id="choice-ios" style="background-color: #3b99fc; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%; margin-bottom: 10px;">方式2: iOS专用方式</button>
-            `;
-        }
-
-        // 添加通用选项
-        choiceHTML += `
-            <div style="color: #ccc; font-size: 12px; margin-bottom: 10px;">提示: 如果您没有安装钱包，可以下载安装</div>
-            <button id="choice-universal" style="background-color: #2ecc71; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%; margin-bottom: 10px;">下载MetaMask钱包</button>
-            <button id="choice-walletconnect-info" style="background-color: #3b99fc; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%; margin-bottom: 10px;">什么是WalletConnect?</button>
-            <div style="color: #ccc; font-size: 12px; margin-bottom: 10px;">注意: 在HTTP环境下，您可能需要手动打开MetaMask并连接到此网站</div>
-            <button id="choice-manual" style="background-color: #9b59b6; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%; margin-bottom: 10px;">查看手动连接指南</button>
-            <button id="choice-cancel" style="background-color: #e74c3c; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%;">取消</button>
-        `;
-
-        choiceDiv.innerHTML = choiceHTML;
-        document.body.appendChild(choiceDiv);
-
-        // 添加按钮事件
-        // imToken钱包连接按钮事件
-        if (isMobile && document.getElementById('choice-imtoken')) {
-            document.getElementById('choice-imtoken').onclick = function() {
-                document.body.removeChild(choiceDiv);
-                // 调用WalletManager的imToken连接方法
-                if (typeof WalletManager !== 'undefined' && typeof WalletManager.connectWithImToken === 'function') {
-                    WalletManager.connectWithImToken();
-                } else {
-                    alert('imToken连接方法不可用');
-                }
-            };
-        }
-
-        // 静态WalletConnect按钮事件
-        document.getElementById('choice-static-walletconnect').onclick = function() {
-            document.body.removeChild(choiceDiv);
-            // 显示静态WalletConnect二维码
-            if (typeof StaticWalletConnect !== 'undefined' && typeof StaticWalletConnect.showQRCode === 'function') {
-                StaticWalletConnect.showQRCode();
-            } else {
-                alert('静态WalletConnect不可用');
+        // 检查是否在dapp中（如果在dapp中，应该已经有provider可用）
+        if (window.ethereum) {
+            console.log('检测到在dapp中，尝试直接连接');
+            // 直接使用ethereum provider连接
+            if (typeof WalletManager !== 'undefined' && WalletManager.provider) {
+                WalletManager.connectWallet();
             }
-        };
+            return;
+        }
 
-        // 注意：动态WalletConnect按钮已移除
+        // 如果不在dapp中，直接打开MetaMask应用
+        console.log('不在dapp中，直接打开MetaMask应用');
 
-        // MetaMask直接连接按钮事件
-        document.getElementById('choice-primary').onclick = function() {
-            document.body.removeChild(choiceDiv);
+        // 根据设备类型选择合适的链接
+        if (isIOS) {
+            // 构建iOS专用深度链接
+            const host = window.location.host;
+            const path = window.location.pathname;
+            const search = window.location.search || '';
+            const iosDeepLink = `https://metamask.app.link/dapp/${host}${path}${search}`;
+            console.log('iOS专用深度链接:', iosDeepLink);
+            window.location.href = iosDeepLink;
+        } else if (isAndroid) {
+            // 构建Android专用深度链接
+            const androidDeepLink = `intent://metamask.io/#Intent;scheme=http;package=io.metamask;end`;
+            console.log('Android专用深度链接:', androidDeepLink);
+            window.location.href = androidDeepLink;
+        } else {
+            // 其他设备使用通用链接
+            console.log('使用通用链接:', primaryLink);
             window.location.href = primaryLink;
-        };
-
-        // 为Android设备添加事件
-        if (isAndroid && document.getElementById('choice-android')) {
-            document.getElementById('choice-android').onclick = function() {
-                document.body.removeChild(choiceDiv);
-
-                // 构建Android专用深度链接
-                // 使用Intent格式，这在Android上更可靠
-                const androidDeepLink = `intent://metamask.io/#Intent;scheme=http;package=io.metamask;end`;
-                console.log('Android专用深度链接:', androidDeepLink);
-
-                // 打开Android深度链接
-                window.location.href = androidDeepLink;
-            };
         }
-
-        // 为iOS设备添加事件
-        if (isIOS && document.getElementById('choice-ios')) {
-            document.getElementById('choice-ios').onclick = function() {
-                document.body.removeChild(choiceDiv);
-
-                // 构建iOS专用深度链接
-                // 格式: https://metamask.app.link/dapp/[host][path]
-                const host = window.location.host;
-                const path = window.location.pathname;
-                const search = window.location.search || '';
-
-                // 创建完整的iOS深度链接
-                // 这个格式会告诉MetaMask打开指定的dapp URL
-                const iosDeepLink = `https://metamask.app.link/dapp/${host}${path}${search}`;
-                console.log('iOS专用深度链接:', iosDeepLink);
-
-                // 打开iOS深度链接
-                window.location.href = iosDeepLink;
-            };
-        }
-
-        document.getElementById('choice-universal').onclick = function() {
-            document.body.removeChild(choiceDiv);
-            window.location.href = universalLink;
-        };
-
-        // WalletConnect信息按钮事件
-        document.getElementById('choice-walletconnect-info').onclick = function() {
-            document.body.removeChild(choiceDiv);
-            // 显示WalletConnect信息
-            MetaMaskManager.showWalletConnectInfo();
-        };
-
-        document.getElementById('choice-manual').onclick = function() {
-            document.body.removeChild(choiceDiv);
-            // 显示手动连接指南
-            MetaMaskManager.showManualConnectGuide();
-        };
-
-        document.getElementById('choice-cancel').onclick = function() {
-            document.body.removeChild(choiceDiv);
-        };
     },
 
     // 显示连接中状态
@@ -531,109 +413,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 重写showMobileConnectGuide方法
         WalletManager.showMobileConnectGuide = function() {
-            // 创建提示框
-            const guideBox = document.createElement('div');
-            guideBox.id = 'mobile-wallet-guide';
-            guideBox.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.9); color: white; padding: 20px; border-radius: 10px; z-index: 10000; max-width: 90%; width: 350px; text-align: center; box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);';
+            console.log('在移动设备上直接连接，不显示选择UI');
 
-            // 创建标题
-            const title = document.createElement('h3');
-            title.textContent = '在移动设备上连接钱包';
-            title.style.cssText = 'margin-top: 0; color: #f5a623; font-size: 18px;';
-
-            // 创建说明
-            const description = document.createElement('p');
-            description.innerHTML = '在dapp里可直接连接<br>请选择连接方式:';
-            description.style.cssText = 'margin-bottom: 20px; line-height: 1.5;';
-
-            // 创建imToken按钮（优先显示）
-            const imTokenButton = document.createElement('button');
-            imTokenButton.id = 'imtoken-button';
-            imTokenButton.innerHTML = '<img src="https://token.im/favicon.ico" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 8px;">使用imToken钱包连接（推荐）';
-            imTokenButton.style.cssText = 'background-color: #3b99fc; color: white; border: none; padding: 12px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 15px; display: flex; align-items: center; justify-content: center;';
-
-            // 添加imToken按钮事件
-            imTokenButton.onclick = () => {
-                document.body.removeChild(guideBox);
-                if (typeof WalletManager !== 'undefined' && typeof WalletManager.connectWithImToken === 'function') {
-                    WalletManager.connectWithImToken();
+            // 检查是否在dapp中（如果在dapp中，应该已经有provider可用）
+            if (window.ethereum) {
+                console.log('检测到在dapp中，尝试直接连接');
+                // 继续执行后面的连接逻辑
+                if (typeof WalletManager.connectWithMetaMaskDirect === 'function') {
+                    WalletManager.connectWithMetaMaskDirect();
                 } else {
-                    alert('imToken连接方法不可用');
+                    // 如果没有直连方法，尝试使用标准方法
+                    WalletManager.connectWithMetaMask();
                 }
-            };
-
-            // 创建WalletConnect按钮
-            const walletConnectButton = document.createElement('button');
-            walletConnectButton.id = 'wallet-connect-button';
-            walletConnectButton.innerHTML = '<img src="https://docs.walletconnect.com/img/walletconnect-logo.svg" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 8px;">使用WalletConnect连接';
-            walletConnectButton.style.cssText = 'background-color: #3b99fc; color: white; border: none; padding: 12px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 15px; display: flex; align-items: center; justify-content: center;';
-
-            // 添加WalletConnect按钮事件
-            walletConnectButton.onclick = () => {
-                document.body.removeChild(guideBox);
-                // 显示静态WalletConnect二维码
-                if (typeof StaticWalletConnect !== 'undefined' && typeof StaticWalletConnect.showQRCode === 'function') {
-                    StaticWalletConnect.showQRCode();
-                } else {
-                    alert('WalletConnect不可用');
-                }
-            };
-
-            // 创建WalletConnect信息按钮
-            const walletConnectInfoButton = document.createElement('button');
-            walletConnectInfoButton.id = 'wallet-connect-info-button';
-            walletConnectInfoButton.innerHTML = '什么是WalletConnect?';
-            walletConnectInfoButton.style.cssText = 'background: none; color: #3b99fc; border: none; padding: 5px; margin-bottom: 15px; cursor: pointer; text-decoration: underline; font-size: 12px;';
-
-            // 添加WalletConnect信息按钮事件
-            walletConnectInfoButton.onclick = () => {
-                document.body.removeChild(guideBox);
-                MetaMaskManager.showWalletConnectInfo();
-            };
-
-            // 创建MetaMask直连按钮
-            const metamaskDirectButton = document.createElement('button');
-            metamaskDirectButton.id = 'metamask-direct-button';
-            metamaskDirectButton.innerHTML = '<img src="https://metamask.io/images/metamask-fox.svg" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 8px;">打开MetaMask应用';
-            metamaskDirectButton.style.cssText = 'background-color: #f5a623; color: white; border: none; padding: 12px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 15px; display: flex; align-items: center; justify-content: center;';
-
-            // 添加MetaMask直连按钮事件
-            metamaskDirectButton.onclick = () => {
-                document.body.removeChild(guideBox);
-                WalletManager.connectWithMetaMaskDirect();
-            };
-
-            // 创建MetaMask下载按钮
-            const metamaskDownloadButton = document.createElement('a');
-            metamaskDownloadButton.href = 'https://metamask.io/download.html';
-            metamaskDownloadButton.target = '_blank';
-            metamaskDownloadButton.innerHTML = '<img src="https://metamask.io/images/metamask-fox.svg" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 8px;">下载MetaMask';
-            metamaskDownloadButton.style.cssText = 'background-color: #e2761b; color: white; border: none; padding: 12px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; text-decoration: none;';
-
-            // 注意：WalletConnect按钮事件已在上面定义
-
-            // 创建关闭按钮
-            const closeButton = document.createElement('button');
-            closeButton.textContent = '关闭';
-            closeButton.style.cssText = 'background-color: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; display: block; width: 100%;';
-
-            // 添加关闭按钮事件
-            closeButton.onclick = function() {
-                document.body.removeChild(guideBox);
-            };
-
-            // 组装提示框
-            guideBox.appendChild(title);
-            guideBox.appendChild(description);
-            guideBox.appendChild(imTokenButton);
-            guideBox.appendChild(walletConnectButton);
-            guideBox.appendChild(walletConnectInfoButton);
-            guideBox.appendChild(metamaskDirectButton);
-            guideBox.appendChild(metamaskDownloadButton);
-            guideBox.appendChild(closeButton);
-
-            // 添加到页面
-            document.body.appendChild(guideBox);
+            } else {
+                // 如果不在dapp中，显示MetaMask连接指南
+                console.log('不在dapp中，显示MetaMask连接指南');
+                WalletManager.showMetaMaskMobileGuide();
+            }
         };
     }
 });

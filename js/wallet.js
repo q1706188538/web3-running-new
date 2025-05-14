@@ -555,9 +555,16 @@ const WalletManager = {
                 return this.connectWithMetaMaskSDK();
             }
 
-            // 直接尝试使用WalletConnect连接，不显示选项UI
-            console.log('移动设备上直接尝试使用WalletConnect连接');
-            return this.connectWithWalletConnect();
+            // 检查是否在dapp中（如果在dapp中，应该已经有provider可用）
+            if (window.ethereum) {
+                console.log('检测到在dapp中，尝试直接连接');
+                // 继续执行后面的连接逻辑
+            } else {
+                // 如果不在dapp中，显示MetaMask连接指南
+                console.log('不在dapp中，显示MetaMask连接指南');
+                this.showMetaMaskMobileGuide();
+                return;
+            }
         }
 
         // 获取MetaMask提供商
