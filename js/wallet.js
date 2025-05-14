@@ -144,14 +144,14 @@ const WalletManager = {
         disconnectBtn.id = 'disconnect-wallet';
         disconnectBtn.className = 'wallet-button';
         disconnectBtn.textContent = '断开连接';
-        disconnectBtn.style.cssText = 'background-color: #e74c3c; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);';
+        disconnectBtn.style.cssText = 'background-color: #e74c3c; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); min-width: 80px; text-align: center;';
 
         // 创建兑换代币按钮 - 放在断开连接按钮下方
         const exchangeBtn = document.createElement('button');
         exchangeBtn.id = 'exchange-token-btn';
         exchangeBtn.className = 'wallet-button';
         exchangeBtn.textContent = '兑换代币';
-        exchangeBtn.style.cssText = 'background-color: #4CAF50; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); transition: all 0.2s ease;';
+        exchangeBtn.style.cssText = 'background-color: #4CAF50; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); transition: all 0.2s ease; min-width: 80px; text-align: center;';
 
         // 添加悬停效果
         exchangeBtn.addEventListener('mouseover', function() {
@@ -179,7 +179,7 @@ const WalletManager = {
         rechargeBtn.id = 'recharge-coins-btn';
         rechargeBtn.className = 'wallet-button';
         rechargeBtn.textContent = '充值金币';
-        rechargeBtn.style.cssText = 'background-color: #9b59b6; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); transition: all 0.2s ease;';
+        rechargeBtn.style.cssText = 'background-color: #9b59b6; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); transition: all 0.2s ease; min-width: 80px; text-align: center;';
 
         // 添加悬停效果
         rechargeBtn.addEventListener('mouseover', function() {
@@ -207,7 +207,7 @@ const WalletManager = {
         freeTrialBtn.id = 'free-trial-btn';
         freeTrialBtn.className = 'wallet-button';
         freeTrialBtn.textContent = '免费体验';
-        freeTrialBtn.style.cssText = 'background-color: #3498db; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); transition: all 0.2s ease;';
+        freeTrialBtn.style.cssText = 'background-color: #3498db; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); transition: all 0.2s ease; min-width: 80px; text-align: center;';
 
         // 添加悬停效果
         freeTrialBtn.addEventListener('mouseover', function() {
@@ -226,11 +226,39 @@ const WalletManager = {
             window.location.href = 'http://taowwww.blakcat.top/';
         });
 
-        // 组装UI - 添加断开连接按钮、兑换代币按钮、充值金币按钮和免费体验按钮
+        // 组装UI
         walletInfo.appendChild(disconnectBtn);
-        walletInfo.appendChild(exchangeBtn);
-        walletInfo.appendChild(rechargeBtn);
-        walletInfo.appendChild(freeTrialBtn);
+
+        // 创建排行榜按钮 - 放在断开连接按钮之后
+        const leaderboardBtn = document.createElement('button');
+        leaderboardBtn.id = 'leaderboard-btn';
+        leaderboardBtn.className = 'wallet-button';
+        leaderboardBtn.textContent = '排行榜';
+        // 统一使用与其他按钮一致的样式参数，并添加min-width和text-align
+        leaderboardBtn.style.cssText = 'background-color: #1abc9c; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); transition: all 0.2s ease; min-width: 80px; text-align: center;';
+
+        leaderboardBtn.addEventListener('mouseover', function() {
+            this.style.backgroundColor = '#16a085';
+            this.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.4)';
+        });
+        leaderboardBtn.addEventListener('mouseout', function() {
+            this.style.backgroundColor = '#1abc9c';
+            this.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.2)';
+        });
+        leaderboardBtn.addEventListener('click', function() {
+            if (typeof LeaderboardPanel !== 'undefined' && LeaderboardPanel.show) {
+                LeaderboardPanel.show();
+            } else {
+                console.error('LeaderboardPanel模块未加载或show方法不存在');
+                alert('排行榜功能暂时不可用，请稍后重试');
+            }
+        });
+        walletInfo.appendChild(leaderboardBtn); // 排行榜按钮
+
+        walletInfo.appendChild(exchangeBtn);    // 兑换代币按钮
+        walletInfo.appendChild(rechargeBtn);    // 充值金币按钮
+        walletInfo.appendChild(freeTrialBtn);   // 免费体验按钮
+
         walletUI.appendChild(connectBtn);
         walletUI.appendChild(walletInfo);
 

@@ -573,6 +573,51 @@ app.post('/api/user/:walletAddress/exchange-tokens', (req, res) => {
 });
 
 /**
+ * 获取排行榜数据
+ * GET /api/leaderboard-data
+ */
+app.get('/api/leaderboard-data', async (req, res) => {
+    console.log('请求排行榜数据...');
+    try {
+        const files = await fs.promises.readdir(DATA_DIR); // 使用 fs.promises
+        const jsonDataFiles = files.filter(file => path.extname(file).toLowerCase() === '.json');
+        
+        let leaderboard = [];
+
+        for (const fileName of jsonDataFiles) {
+            try {
+                const filePath = path.join(DATA_DIR, fileName);
+                const fileContent = await fs.promises.readFile(filePath, 'utf-8');
+                const userData = JSON.parse(fileContent);
+                
+                const userId = path.basename(fileName, '.json');
+                
+                if (userData && typeof userData.lastScore === 'number') {
+                    leaderboard.push({
+                        userId: userId,
+                        score: userData.lastScore
+                    });
+                } else {
+                    console.warn(`用户数据文件 ${fileName} 中缺少 lastScore 或格式不正确。`);
+                }
+            } catch (parseError) {
+                console.error(`解析文件 ${fileName} 的JSON时出错:`, parseError);
+            }
+        }
+
+        // 按分数降序排序
+        leaderboard.sort((a, b) => b.score - a.score);
+
+        console.log(`成功获取并排序了 ${leaderboard.length} 条排行榜数据。`);
+        res.status(200).json(leaderboard);
+
+    } catch (error) {
+        console.error('获取排行榜数据时出错:', error);
+        res.status(500).json({ error: '获取排行榜数据失败' });
+    }
+});
+
+/**
  * 获取兑换历史
  * GET /api/user/:walletAddress/exchange-history
  */

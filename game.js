@@ -32006,19 +32006,239 @@ THREE.SphereBufferGeometry.prototype.clone = function() {
 };
 GEMIOLI.Menu = function() {
 	GEMIOLI.Layer.call(this);
-	var a = this;
+	var a = this; // 'a' is the instance of GEMIOLI.Menu
+
+	// --- Logic from play-button-interceptor.js ---
+	const COINS_COST = typeof GameConfig !== 'undefined' ? GameConfig.GAME_START_COST : 10;
+
+	function createConfirmationDialogInternal() {
+		if (document.getElementById('game-start-confirmation-native')) {
+			return;
+		}
+		const dialog = document.createElement('div');
+		dialog.id = 'game-start-confirmation-native';
+		dialog.style.display = 'none';
+		dialog.style.position = 'fixed';
+		dialog.style.top = '0';
+		dialog.style.left = '0';
+		dialog.style.width = '100%';
+		dialog.style.height = '100%';
+		dialog.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+		dialog.style.zIndex = '9999';
+		dialog.style.justifyContent = 'center';
+		dialog.style.alignItems = 'center';
+
+		const content = document.createElement('div');
+		content.style.backgroundColor = '#fff';
+		content.style.padding = '20px';
+		content.style.borderRadius = '10px';
+		content.style.maxWidth = '80%';
+		content.style.textAlign = 'center';
+
+		const message = document.createElement('p');
+		message.id = 'game-start-message-native';
+		message.textContent = '本次游戏将扣除金币，是否继续？';
+		message.style.fontSize = '18px';
+		message.style.marginBottom = '20px';
+
+		const buttonContainer = document.createElement('div');
+		buttonContainer.style.display = 'flex';
+		buttonContainer.style.justifyContent = 'center';
+		buttonContainer.style.gap = '10px';
+
+		const confirmButton = document.createElement('button');
+		confirmButton.textContent = '确认开始';
+		confirmButton.style.padding = '10px 20px';
+		confirmButton.style.backgroundColor = '#4CAF50';
+		confirmButton.style.color = 'white';
+		confirmButton.style.border = 'none';
+		confirmButton.style.borderRadius = '5px';
+		confirmButton.style.cursor = 'pointer';
+		confirmButton.onclick = () => onConfirmInternal(); // Use arrow function to keep 'a' context if needed
+
+		const cancelButton = document.createElement('button');
+		cancelButton.textContent = '取消';
+		cancelButton.style.padding = '10px 20px';
+		cancelButton.style.backgroundColor = '#f44336';
+		cancelButton.style.color = 'white';
+		cancelButton.style.border = 'none';
+		cancelButton.style.borderRadius = '5px';
+		cancelButton.style.cursor = 'pointer';
+		cancelButton.onclick = onCancelInternal;
+
+		buttonContainer.appendChild(confirmButton);
+		buttonContainer.appendChild(cancelButton);
+		content.appendChild(message);
+		content.appendChild(buttonContainer);
+		dialog.appendChild(content);
+		document.body.appendChild(dialog);
+		console.log('已创建原生游戏开始确认对话框');
+	}
+
+	async function showConfirmationInternal() {
+		createConfirmationDialogInternal();
+		try {
+			const dialog = document.getElementById('game-start-confirmation-native');
+			if (dialog) {
+				dialog.style.display = 'flex';
+			}
+
+			const confirmButton = document.querySelector('#game-start-confirmation-native button:first-child');
+			const message = document.getElementById('game-start-message-native');
+
+			if (message) message.textContent = '正在获取金币余额...';
+			if (confirmButton) {
+				confirmButton.disabled = true;
+				confirmButton.style.opacity = '0.5';
+				confirmButton.style.cursor = 'not-allowed';
+			}
+
+			if (typeof WalletManager === 'undefined' || !WalletManager.isConnected() || typeof ApiService === 'undefined') {
+				if (message) message.textContent = '无法连接到钱包或API服务。';
+				if (confirmButton) confirmButton.style.display = 'none';
+				return;
+			}
+
+			let currentCoins = 0;
+			try {
+				const walletAddress = WalletManager.getAccount();
+				currentCoins = await ApiService.getCoins(walletAddress);
+			} catch (error) {
+				console.error('获取金币余额时出错:', error);
+				if (message) message.textContent = '获取金币余额时出错。';
+				if (confirmButton) confirmButton.style.display = 'none';
+				return;
+			}
+
+			if (message) {
+				message.textContent = `本次游戏将扣除 ${COINS_COST} 金币，当前余额: ${currentCoins} 金币，是否继续？`;
+				if (currentCoins < COINS_COST) {
+					message.textContent = `金币不足！需要 ${COINS_COST}，当前: ${currentCoins}。`;
+					if (confirmButton) confirmButton.style.display = 'none';
+				} else {
+					if (confirmButton) {
+						confirmButton.style.display = 'inline-block';
+						confirmButton.disabled = false;
+						confirmButton.style.opacity = '1';
+						confirmButton.style.cursor = 'pointer';
+					}
+				}
+			}
+		} catch (error) {
+			console.error('显示原生确认对话框时出错:', error);
+			const message = document.getElementById('game-start-message-native');
+			if (message) message.textContent = '显示确认对话框时出错。';
+			const confirmButton = document.querySelector('#game-start-confirmation-native button:first-child');
+			if (confirmButton) confirmButton.style.display = 'none';
+		}
+	}
+
+	async function onConfirmInternal() {
+		try {
+			const confirmButton = document.querySelector('#game-start-confirmation-native button:first-child');
+			if (confirmButton) {
+				confirmButton.disabled = true;
+				confirmButton.style.opacity = '0.5';
+				confirmButton.style.cursor = 'not-allowed';
+			}
+
+			if (typeof WalletManager === 'undefined' || !WalletManager.isConnected() || typeof ApiService === 'undefined') {
+				alert('无法连接到钱包或API服务。');
+				hideConfirmationInternal();
+				if (confirmButton) {
+					confirmButton.disabled = false;
+					confirmButton.style.opacity = '1';
+					confirmButton.style.cursor = 'pointer';
+				}
+				return;
+			}
+
+			let currentCoins = 0;
+			try {
+				const walletAddress = WalletManager.getAccount();
+				currentCoins = await ApiService.getCoins(walletAddress);
+			} catch (error) {
+				alert('获取金币余额时出错。');
+				hideConfirmationInternal();
+				if (confirmButton) {
+					confirmButton.disabled = false;
+					confirmButton.style.opacity = '1';
+					confirmButton.style.cursor = 'pointer';
+				}
+				return;
+			}
+
+			if (currentCoins < COINS_COST) {
+				alert('金币不足，无法开始游戏！');
+				hideConfirmationInternal();
+				if (confirmButton) {
+					confirmButton.disabled = false;
+					confirmButton.style.opacity = '1';
+					confirmButton.style.cursor = 'pointer';
+				}
+				return;
+			}
+
+			try {
+				const walletAddress = WalletManager.getAccount();
+				await ApiService.updateCoins(walletAddress, COINS_COST, 'subtract', 'play');
+			} catch (error) {
+				alert('扣除金币时出错。');
+				hideConfirmationInternal();
+				if (confirmButton) {
+					confirmButton.disabled = false;
+					confirmButton.style.opacity = '1';
+					confirmButton.style.cursor = 'pointer';
+				}
+				return;
+			}
+
+			hideConfirmationInternal();
+
+			// Original game start logic (from 'a' context)
+			a.hide();
+			GEMIOLI.SoundLoader.load("button").play();
+			GEMIOLI.Play.show();
+
+			if (typeof GameStatusPanel !== 'undefined' && GameStatusPanel.updatePanel) {
+				GameStatusPanel.updatePanel();
+			}
+
+		} catch (error) {
+			console.error('原生确认开始游戏时出错:', error);
+			alert('开始游戏时出错！');
+			const confirmButton = document.querySelector('#game-start-confirmation-native button:first-child');
+			if (confirmButton) {
+					confirmButton.disabled = false;
+					confirmButton.style.opacity = '1';
+					confirmButton.style.cursor = 'pointer';
+			}
+		}
+	}
+
+	function onCancelInternal() {
+		hideConfirmationInternal();
+	}
+
+	function hideConfirmationInternal() {
+		const dialog = document.getElementById('game-start-confirmation-native');
+		if (dialog) {
+			dialog.style.display = 'none';
+		}
+	}
+	// --- End of logic from play-button-interceptor.js ---
+
+
 	a.bottom = new GEMIOLI.DisplayObjectContainer();
 	a.addChild(a.bottom);
 	a.play = new GEMIOLI.Button(-204, -198, 408, 397, [13, 32, 27]);
 	a.play.addChild(GEMIOLI.AtlasQuad.fromRect(-204, -198, 408, 397, "atlases/menu.atlas", "play"));
 	a.play.y = -190;
-	a.play.addEventListener("click", function(b) {
+	a.play.addEventListener("click", async function(b) { // MODIFIED: added async
 		if (!a.showing || GEMIOLI.Button.inFocus) {
 			return
 		}
-		a.hide();
-		GEMIOLI.SoundLoader.load("button").play();
-		GEMIOLI.Play.show()
+		await showConfirmationInternal(); // MODIFIED: Call our new confirmation logic
 	});
 	a.bottom.addChild(a.play);
 	a.addEventListener("pointerdown", function(b) {
@@ -32055,9 +32275,9 @@ GEMIOLI.Menu = function() {
 		GEMIOLI.Shop.show()
 	});
 	a.bottom.addChild(a.shop);
-	a.title1 = GEMIOLI.AtlasQuad.fromRect(-447, -58, 595, 217, "atlases/menu.atlas", "title1");
-	a.addChild(a.title1);
-	a.title2 = GEMIOLI.AtlasQuad.fromRect(-205, -54, 510, 128, "atlases/menu.atlas", "title2");
+	//a.title1 = GEMIOLI.AtlasQuad.fromRect(-447, -58, 595, 217, "atlases/menu.atlas", "title1");
+	//a.addChild(a.title1);
+	a.title2 = GEMIOLI.AtlasQuad.fromRect(-420, -300, 810, 228, "atlases/menu.atlas", "title2");
 	a.addChild(a.title2);
 	a.top = new GEMIOLI.DisplayObjectContainer();
 	a.addChild(a.top);
@@ -32105,10 +32325,10 @@ GEMIOLI.Menu.prototype.update = function(b, c) {
 	}
 	a.top.x = a.bottom.x = a.width / 2;
 	a.bottom.y = (1 - (a.showing ? TWEEN.Easing.Back.Out(a.time) : a.time)) * 500 + a.height;
-	a.title1.y = a.title2.y = a.top.y = (1 - (a.showing ? TWEEN.Easing.Back.Out(a.time) : a.time)) * -700;
-	a.title1.x = (a.width / 2 - 0) - (1 - (a.showing ? TWEEN.Easing.Elastic.Out(a.time) : a.time)) * (a.width / 2 - 50 + 320);
+	//a.title1.y = a.title2.y = a.top.y = (1 - (a.showing ? TWEEN.Easing.Back.Out(a.time) : a.time)) * -700;
+	//a.title1.x = (a.width / 2 - 0) - (1 - (a.showing ? TWEEN.Easing.Elastic.Out(a.time) : a.time)) * (a.width / 2 - 50 + 320);
 	a.title2.x = (a.width / 2 + 40) + (1 - (a.showing ? TWEEN.Easing.Elastic.Out(a.time) : a.time)) * (a.width / 2 + 320);
-	a.title1.y = 250;
+	//a.title1.y = 250;
 	a.title2.y = 450;
 	var d = 1 + 0.02 * Math.abs(Math.sin(8 * c));
 	a.play.scaleX = a.play.scaleY = d
