@@ -32825,8 +32825,13 @@ GEMIOLI.Score.prototype.update = function(d, e) {
 		if ((c.opacity += d) > 1) {
 			c.opacity = 1;
 			if (!c.adsShown) {
-				if (GameAPI.GameBreak && GameAPI.GameBreak.request) {
-					GameAPI.GameBreak.request(SpilData.pauseGame, SpilData.resumeGame)
+				try {
+					if (GameAPI.GameBreak && GameAPI.GameBreak.request) {
+						GameAPI.GameBreak.request(SpilData.pauseGame, SpilData.resumeGame)
+					}
+				} catch (error) {
+					console.error('GameAPI.GameBreak.request 调用失败:', error);
+					// 继续执行，不让错误中断游戏流程
 				}
 				c.adsShown = true
 			}
@@ -32842,35 +32847,75 @@ GEMIOLI.Score.prototype.update = function(d, e) {
 	c.fade.tint.a = c.opacity;
 	c.center.x = c.width / 2;
 	c.center.y = c.height / 2 + (c.showing ? -c.height / 2 * TWEEN.Easing.Back.In(1 - c.opacity) : c.height / 2 * TWEEN.Easing.Back.In(1 - c.opacity));
-	var b = Math.max(c.time - 0.4, 0) / 0.6;
-	if (b < 0.7 && c.countSound) {
-		GEMIOLI.SoundLoader.load("count").play();
-		c.countSound = false
-	}
-	var g = Math.floor(c.score * (1 - b)).toString();
-	c.scoreText.text = "";
-	for (var a = 0; a < g.length; ++a) {
-		if ((g.length - a) % 3 === 0 && a !== 0) {
-			c.scoreText.text += ","
+	try {
+		var b = Math.max(c.time - 0.4, 0) / 0.6;
+		if (b < 0.7 && c.countSound) {
+			try {
+				GEMIOLI.SoundLoader.load("count").play();
+			} catch (error) {
+				console.error('播放计数声音失败:', error);
+			}
+			c.countSound = false
 		}
-		c.scoreText.text += g[a]
+		var g = Math.floor(c.score * (1 - b)).toString();
+		c.scoreText.text = "";
+		for (var a = 0; a < g.length; ++a) {
+			if ((g.length - a) % 3 === 0 && a !== 0) {
+				c.scoreText.text += ","
+			}
+			c.scoreText.text += g[a]
+		}
+		var f = 1 + 0.1 * Math.abs(Math.sin(b * 10));
+		c.scoreText.scaleX = c.scoreText.scaleY = f;
+	} catch (error) {
+		console.error('更新分数文本时出错:', error);
+		// 设置一个默认值，防止游戏卡死
+		if (c.scoreText) {
+			c.scoreText.text = c.score.toString();
+			c.scoreText.scaleX = c.scoreText.scaleY = 1;
+		}
 	}
-	var f = 1 + 0.1 * Math.abs(Math.sin(b * 10));
-	c.scoreText.scaleX = c.scoreText.scaleY = f;
-	b = Math.max(Math.min(c.time, 0.5) - 0.3, 0) / 0.2;
-	c.medal.y = -540 - c.height / 2 * TWEEN.Easing.Back.In(b);
-	c.medal.scaleX = c.medal.scaleY = 1 + 0.2 * TWEEN.Easing.Back.Out(b);
-	if (c.medal.visible && c.medalSound && b <= 0.5) {
-		c.medalSound = false;
-		GEMIOLI.SoundLoader.load("medal").play()
+	try {
+		b = Math.max(Math.min(c.time, 0.5) - 0.3, 0) / 0.2;
+		if (c.medal) {
+			c.medal.y = -540 - c.height / 2 * TWEEN.Easing.Back.In(b);
+			c.medal.scaleX = c.medal.scaleY = 1 + 0.2 * TWEEN.Easing.Back.Out(b);
+			if (c.medal.visible && c.medalSound && b <= 0.5) {
+				c.medalSound = false;
+				try {
+					GEMIOLI.SoundLoader.load("medal").play();
+				} catch (error) {
+					console.error('播放奖牌声音失败:', error);
+				}
+			}
+		}
+
+		b = Math.max(Math.min(c.time, 0.4) - 0.2, 0) / 0.2;
+		if (c.center) {
+			c.center.scaleX = c.center.scaleY = 1 + 0.1 * Math.sin(b * Math.PI);
+		}
+
+		if (b <= 0.3 && c.panelSound) {
+			c.panelSound = false;
+			try {
+				GEMIOLI.SoundLoader.load("runR_wood").play();
+			} catch (error) {
+				console.error('播放面板声音失败:', error);
+			}
+		}
+
+		if (c.shop) {
+			try {
+				c.shop.scaleX = c.shop.scaleY = 1 + (c.shopAttract !== 0 ? 0.1 * Math.abs(Math.sin(10 * (e || 0))) : 0);
+			} catch (error) {
+				console.error('更新商店按钮缩放失败:', error);
+				c.shop.scaleX = c.shop.scaleY = 1;
+			}
+		}
+	} catch (error) {
+		console.error('更新结算页面动画时出错:', error);
+		// 防止游戏卡死，确保基本功能正常
 	}
-	b = Math.max(Math.min(c.time, 0.4) - 0.2, 0) / 0.2;
-	c.center.scaleX = c.center.scaleY = 1 + 0.1 * Math.sin(b * Math.PI);
-	if (b <= 0.3 && c.panelSound) {
-		GEMIOLI.SoundLoader.load("runR_wood").play();
-		c.panelSound = false
-	}
-	c.shop.scaleX = c.shop.scaleY = 1 + (c.shopAttract !== 0 ? 0.1 * Math.abs(Math.sin(10 * e)) : 0)
 };
 GEMIOLI.Shop = function() {
 	GEMIOLI.Layer.call(this);
