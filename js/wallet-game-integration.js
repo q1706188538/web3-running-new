@@ -286,8 +286,9 @@ const WalletGameIntegration = {
                         }
 
                         // 定义一个函数，用于处理验证游戏数据
-                        const processGameVerification = function(verificationData) {
+                        const processGameVerification = function(verificationData, gameScore, isNewScore) {
                             console.log('生成的校验数据:', verificationData);
+                            console.log('游戏得分:', gameScore, '是否是新的最高得分:', isNewScore);
 
                             // 如果ApiService.verifyGameData方法不可用，使用fetch API
                             if (typeof window.ApiService.verifyGameData !== 'function') {
@@ -302,7 +303,9 @@ const WalletGameIntegration = {
                                     body: JSON.stringify({
                                         walletAddress,
                                         gameCoins: currentGameCoins,
-                                        verification: verificationData
+                                        verification: verificationData,
+                                        gameScore: gameScore || 0, // 添加游戏得分
+                                        isNewHighScore: isNewScore || false // 添加是否是新的最高得分标志
                                     })
                                 })
                                 .then(response => {
@@ -338,7 +341,7 @@ const WalletGameIntegration = {
                             } else {
                                 // 使用ApiService.verifyGameData方法
                                 console.log('使用ApiService.verifyGameData方法验证游戏数据');
-                                return ApiService.verifyGameData(walletAddress, currentGameCoins, verificationData);
+                                return ApiService.verifyGameData(walletAddress, currentGameCoins, verificationData, gameScore);
                             }
                         };
 
@@ -352,7 +355,7 @@ const WalletGameIntegration = {
                                 }
 
                                 // 处理验证
-                                return processGameVerification(verificationData)
+                                return processGameVerification(verificationData, currentGameScore, isNewLastScore)
                                     .then(result => {
                                         if (result && result.success) {
                                             if (window.DEBUG_MODE) console.log('成功验证游戏数据并更新金币');

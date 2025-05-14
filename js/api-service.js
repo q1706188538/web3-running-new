@@ -320,8 +320,8 @@ const ApiService = {
         return userData?.achievements || [];
     },
 
-    // 验证游戏数据并更新金币
-    verifyGameData: async function(walletAddress, gameCoins, verification) {
+    // 验证游戏数据并更新金币和最高得分
+    verifyGameData: async function(walletAddress, gameCoins, verification, gameScore) {
         if (!walletAddress) {
             console.error('验证游戏数据失败: 钱包地址为空');
             return { success: false, error: '钱包地址为空' };
@@ -340,6 +340,7 @@ const ApiService = {
         try {
             const url = this.buildApiUrl('/verify-game-data');
             console.log('验证游戏数据URL:', url);
+            console.log('游戏得分:', gameScore);
 
             const response = await fetch(url, {
                 method: 'POST',
@@ -349,7 +350,8 @@ const ApiService = {
                 body: JSON.stringify({
                     walletAddress,
                     gameCoins,
-                    verification
+                    verification,
+                    gameScore: gameScore || 0 // 添加游戏得分
                 })
             });
 
