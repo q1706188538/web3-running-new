@@ -2,16 +2,19 @@
   "name": "temple-runner-game",
   "version": "1.0.0",
   "description": "神庙逃亡游戏",
-  "main": "server-frontend.js",
+  "main": "server/server.js",
   "scripts": {
-    "start-frontend": "node server-frontend.js",
-    "start-backend": "node server/server.js",
-    "start": "concurrently \"npm run start-frontend\" \"npm run start-backend\""
+    "start": "node server/server.js",
+    "restart": "npm run kill && npm start",
+    "kill": "npx kill-port 9000"
   },
   "dependencies": {
     "@walletconnect/qrcode-modal": "^1.8.0",
     "@walletconnect/web3-provider": "^1.8.0",
-    "concurrently": "^8.0.1",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "kill-port": "^2.0.1"
   }
 }

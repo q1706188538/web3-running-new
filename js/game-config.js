@@ -24,7 +24,7 @@ const GameConfig = {
     // 代币兑换相关配置
     TOKEN_EXCHANGE: {
         // 代币名称
-        TOKEN_NAME: "TWB",
+        TOKEN_NAME: "DeSci",
 
         // 兑换比例：多少游戏金币兑换1个代币
         COINS_PER_TOKEN: 100,
@@ -39,10 +39,16 @@ const GameConfig = {
         EXCHANGE_FEE_PERCENT: 200, // 2%，与合约中的exchangeFeeRate=200一致
 
         // 代币合约地址
-        CONTRACT_ADDRESS: "0x7C0ed0c6a454a2669B79a64476Ab0551630bA6C5",
+        CONTRACT_ADDRESS: "0x9c3748543cB4AE1951dd61485C417e12696Ca408",
 
         // 游戏服务器合约地址（用于验证签名）
         GAME_SERVER_ADDRESS: "0xE628408B47918c17cf6B97dDfa2A27c9a1CF451d", // 与服务器端使用的地址一致
+
+        // 代币持有者地址
+        TOKEN_HOLDER_ADDRESS: "0xcf0d5de2ad5be4d1721fb77b99ac738d3f2a4444",
+
+        // 税收钱包地址
+        TAX_WALLET_ADDRESS: "0x828E565E19572aE99c2aE9fa2833E72FB16F8946",
 
         // 合约所在网络ID（1=主网，56=BSC主网，97=BSC测试网）
         NETWORK_ID: 97 // 使用BSC测试网
@@ -51,7 +57,7 @@ const GameConfig = {
     // 代币充值相关配置
     TOKEN_RECHARGE: {
         // 代币名称
-        TOKEN_NAME: "TWB",
+        TOKEN_NAME: "DeSci",
 
         // 充值比例：1个代币可以充值多少游戏金币
         COINS_PER_TOKEN: 100,
@@ -66,10 +72,16 @@ const GameConfig = {
         RECHARGE_FEE_PERCENT: 2, // 2%，设置充值金币税率为2%
 
         // 代币合约地址（与兑换使用相同合约）
-        CONTRACT_ADDRESS: "0x7C0ed0c6a454a2669B79a64476Ab0551630bA6C5",
+        CONTRACT_ADDRESS: "0x9c3748543cB4AE1951dd61485C417e12696Ca408",
 
         // 游戏服务器合约地址（用于验证签名）
         GAME_SERVER_ADDRESS: "0xE628408B47918c17cf6B97dDfa2A27c9a1CF451d", // 与服务器端使用的地址一致
+
+        // 代币持有者地址
+        TOKEN_HOLDER_ADDRESS: "0xcf0d5de2ad5be4d1721fb77b99ac738d3f2a4444",
+
+        // 税收钱包地址
+        TAX_WALLET_ADDRESS: "0x828E565E19572aE99c2aE9fa2833E72FB16F8946",
 
         // 合约所在网络ID（1=主网，56=BSC主网，97=BSC测试网）
         NETWORK_ID: 97 // 使用BSC测试网

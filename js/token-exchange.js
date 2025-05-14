@@ -535,7 +535,7 @@ const TokenExchange = {
                 return;
             }
 
-            // 获取代币余额 - 优先使用Web3合约
+            // 获取代币余额 - 只使用Web3合约
             if (typeof Web3TokenContract !== 'undefined' && Web3TokenContract.tokenContract) {
                 try {
                     const balanceResult = await Web3TokenContract.getBalance(this.walletAddress);
@@ -543,19 +543,19 @@ const TokenExchange = {
                         this.currentTokens = parseFloat(balanceResult.balanceInEther);
                         console.log('从Web3合约获取的代币余额:', this.currentTokens);
                     } else {
-                        // 如果Web3获取失败，回退到API
-                        this.currentTokens = await ApiService.getTokenBalance(this.walletAddress);
-                        console.log('从API获取的代币余额:', this.currentTokens);
+                        console.error('获取代币余额失败');
+                        this.showResultMessage('获取代币余额失败，请刷新页面后重试', 'error');
+                        this.currentTokens = 0;
                     }
                 } catch (error) {
-                    console.error('从Web3获取代币余额失败，回退到API:', error);
-                    this.currentTokens = await ApiService.getTokenBalance(this.walletAddress);
-                    console.log('从API获取的代币余额:', this.currentTokens);
+                    console.error('获取代币余额失败:', error);
+                    this.showResultMessage('获取代币余额失败: ' + error.message, 'error');
+                    this.currentTokens = 0;
                 }
             } else {
-                // 如果Web3合约不可用，使用API
-                this.currentTokens = await ApiService.getTokenBalance(this.walletAddress);
-                console.log('从API获取的代币余额:', this.currentTokens);
+                console.error('Web3合约不可用，无法获取代币余额');
+                this.showResultMessage('Web3合约不可用，无法获取代币余额', 'error');
+                this.currentTokens = 0;
             }
 
             // 更新UI

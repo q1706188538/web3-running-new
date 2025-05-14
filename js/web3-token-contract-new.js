@@ -9,6 +9,9 @@ const Web3TokenContract = {
     // 代币合约实例
     tokenContract: null,
 
+    // 外部代币合约实例
+    externalTokenContract: null,
+
     // 代币合约地址
     contractAddress: null,
 
@@ -49,11 +52,15 @@ const Web3TokenContract = {
             }
 
             // 加载ABI
-            if (typeof TempleRunTokenWithTaxABI_Updated !== 'undefined') {
+            if (typeof GameTokenBridgeABI !== 'undefined') {
+                this.contractABI = GameTokenBridgeABI;
+                console.log('已从全局变量加载合约ABI (GameTokenBridgeABI)');
+            } else if (typeof TempleRunTokenWithTaxABI_Updated !== 'undefined') {
                 this.contractABI = TempleRunTokenWithTaxABI_Updated;
                 console.log('已从全局变量加载合约ABI (TempleRunTokenWithTaxABI_Updated)');
+                console.warn('推荐使用GameTokenBridgeABI，请确保已加载相应的ABI文件');
             } else {
-                console.error('未找到TempleRunTokenWithTaxABI_Updated，请确保已加载相应的ABI文件');
+                console.error('未找到GameTokenBridgeABI或TempleRunTokenWithTaxABI_Updated，请确保已加载相应的ABI文件');
                 return false;
             }
 
@@ -85,6 +92,54 @@ const Web3TokenContract = {
             if (!this.tokenContract) {
                 console.error('合约实例创建失败');
                 return false;
+            }
+
+            // 尝试获取外部代币地址并创建外部代币合约实例
+            try {
+                // 获取外部代币地址
+                const externalTokenAddress = await this.tokenContract.methods.externalToken().call();
+                console.log('从桥接合约获取到外部代币地址:', externalTokenAddress);
+
+                if (externalTokenAddress) {
+                    // 创建外部代币合约实例
+                    const tokenABI = [
+                        // ERC20标准方法
+                        {
+                            "constant": true,
+                            "inputs": [{"name": "_owner", "type": "address"}],
+                            "name": "balanceOf",
+                            "outputs": [{"name": "balance", "type": "uint256"}],
+                            "type": "function"
+                        },
+                        {
+                            "constant": true,
+                            "inputs": [],
+                            "name": "decimals",
+                            "outputs": [{"name": "", "type": "uint8"}],
+                            "type": "function"
+                        },
+                        {
+                            "constant": false,
+                            "inputs": [{"name": "_spender", "type": "address"}, {"name": "_value", "type": "uint256"}],
+                            "name": "approve",
+                            "outputs": [{"name": "", "type": "bool"}],
+                            "type": "function"
+                        },
+                        {
+                            "constant": true,
+                            "inputs": [{"name": "_owner", "type": "address"}, {"name": "_spender", "type": "address"}],
+                            "name": "allowance",
+                            "outputs": [{"name": "", "type": "uint256"}],
+                            "type": "function"
+                        }
+                    ];
+
+                    this.externalTokenContract = new this.web3.eth.Contract(tokenABI, externalTokenAddress);
+                    console.log('外部代币合约实例已创建');
+                }
+            } catch (error) {
+                console.warn('获取外部代币地址或创建外部代币合约实例失败:', error);
+                console.warn('这可能会影响某些功能，但不会阻止初始化');
             }
 
             console.log('合约实例有效，初始化完成');
@@ -338,11 +393,55 @@ const Web3TokenContract = {
         }
 
         try {
+            // 从桥接合约获取外部代币地址
+            let externalTokenAddress = null;
+            try {
+                // 只使用externalToken方法获取外部代币地址
+                externalTokenAddress = await this.tokenContract.methods.externalToken().call();
+                console.log('从桥接合约获取到外部代币地址:', externalTokenAddress);
+
+                if (!externalTokenAddress) {
+                    throw new Error('外部代币地址为空');
+                }
+            } catch (error) {
+                console.error('从桥接合约获取外部代币地址失败:', error);
+                throw new Error('无法获取外部代币地址，请确保合约已正确初始化');
+            }
+
+            // 创建外部代币合约实例
+            const tokenABI = [
+                // ERC20标准方法
+                {
+                    "constant": true,
+                    "inputs": [{"name": "_owner", "type": "address"}],
+                    "name": "balanceOf",
+                    "outputs": [{"name": "balance", "type": "uint256"}],
+                    "type": "function"
+                },
+                {
+                    "constant": true,
+                    "inputs": [],
+                    "name": "decimals",
+                    "outputs": [{"name": "", "type": "uint8"}],
+                    "type": "function"
+                }
+            ];
+
+            const externalTokenContract = new this.web3.eth.Contract(tokenABI, externalTokenAddress);
+            console.log('已创建外部代币合约实例');
+
             // 获取代币余额
-            const balance = await this.tokenContract.methods.balanceOf(walletAddress).call();
+            const balance = await externalTokenContract.methods.balanceOf(walletAddress).call();
+            console.log('获取到代币余额:', balance);
 
             // 获取代币小数位数
-            const decimals = await this.tokenContract.methods.decimals().call();
+            let decimals = 18; // 默认为18
+            try {
+                decimals = await externalTokenContract.methods.decimals().call();
+                console.log('获取到代币小数位数:', decimals);
+            } catch (error) {
+                console.warn('获取代币小数位数失败，使用默认值18:', error);
+            }
 
             // 转换为可读格式
             const balanceInEther = this.web3.utils.fromWei(balance, 'ether');
@@ -638,6 +737,36 @@ const Web3TokenContract = {
                 };
             }
 
+            // 检查玩家代币余额
+            if (this.externalTokenContract) {
+                try {
+                    const playerBalance = await this.externalTokenContract.methods.balanceOf(this.userAddress).call();
+                    console.log('玩家代币余额:', this.web3.utils.fromWei(playerBalance, 'ether'));
+
+                    if (BigInt(playerBalance) < BigInt(tokenAmountInWei)) {
+                        return { success: false, error: '代币余额不足' };
+                    }
+
+                    // 检查玩家授权额度
+                    const allowance = await this.externalTokenContract.methods.allowance(this.userAddress, this.contractAddress).call();
+                    console.log('授权额度:', this.web3.utils.fromWei(allowance, 'ether'));
+
+                    if (BigInt(allowance) < BigInt(tokenAmountInWei)) {
+                        // 如果授权额度不足，先进行授权
+                        console.log('授权额度不足，正在授权...');
+                        const approveResult = await this.approveTokens(tokenAmountInWei);
+                        if (!approveResult.success) {
+                            return { success: false, error: '授权失败: ' + approveResult.error };
+                        }
+                    }
+                } catch (error) {
+                    console.error('检查代币余额或授权失败:', error);
+                    return { success: false, error: '检查代币余额或授权失败: ' + error.message };
+                }
+            } else {
+                console.warn('外部代币合约未初始化，无法检查代币余额和授权');
+            }
+
             // 检查签名长度
             if (signature.length !== 132) {
                 console.error('签名长度不正确:', signature.length);
@@ -651,11 +780,11 @@ const Web3TokenContract = {
             // 打印完整的调用信息
             console.log('完整的合约调用信息:');
             console.log('- 函数名: rechargeToGame');
-            console.log('- 参数1 (player):', this.userAddress);
-            console.log('- 参数2 (gameCoins):', gameCoinsToGain);
-            console.log('- 参数3 (tokenAmount):', tokenAmountInWei);
-            console.log('- 参数4 (nonce):', nonce);
-            console.log('- 参数5 (signature):', signature);
+            console.log('- 参数1 (gameCoins):', gameCoinsToGain);
+            console.log('- 参数2 (tokenAmount):', tokenAmountInWei);
+            console.log('- 参数3 (nonce):', nonce);
+            console.log('- 参数4 (signature):', signature);
+            console.log('- 发送者 (msg.sender):', this.userAddress);
 
             // 打印参数的十六进制表示
             console.log('参数的十六进制表示:');
@@ -668,7 +797,6 @@ const Web3TokenContract = {
             // 打印ABI编码
             try {
                 const encodedABI = this.tokenContract.methods.rechargeToGame(
-                    this.userAddress,
                     gameCoinsToGain,
                     tokenAmountInWei,
                     nonce,
@@ -684,7 +812,6 @@ const Web3TokenContract = {
                 console.log('调用合约rechargeToGame方法...');
 
                 const tx = await this.tokenContract.methods.rechargeToGame(
-                    this.userAddress,
                     gameCoinsToGain,
                     tokenAmountInWei,
                     nonce,
@@ -814,6 +941,38 @@ const Web3TokenContract = {
             }
         }
         return true; // 如果没有订阅，也返回成功
+    },
+
+    // 授权代币
+    approveTokens: async function(amount) {
+        if (!this.externalTokenContract) {
+            console.error('授权代币失败: 外部代币合约未初始化');
+            return { success: false, error: '外部代币合约未初始化' };
+        }
+
+        if (!this.userAddress) {
+            console.error('授权代币失败: 未连接钱包');
+            return { success: false, error: '未连接钱包' };
+        }
+
+        try {
+            console.log('授权代币:', amount, '给合约地址:', this.contractAddress);
+
+            // 调用外部代币合约的approve方法
+            const tx = await this.externalTokenContract.methods.approve(
+                this.contractAddress,
+                amount
+            ).send({
+                from: this.userAddress,
+                gas: 100000 // 设置适当的gas限制
+            });
+
+            console.log('授权交易已提交:', tx);
+            return { success: true, txHash: tx.transactionHash };
+        } catch (error) {
+            console.error('授权代币失败:', error);
+            return { success: false, error: error.message };
+        }
     },
 
     // 获取代币税率

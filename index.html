@@ -21,8 +21,48 @@
 		<script type="text/javascript" src="./js/simple-wallet-connect.js"></script>
 		<script type="text/javascript" src="./js/static-wallet-connect.js"></script>
 
-		<!-- API服务 - 最先加载 -->
+		<!-- 配置脚本 - 必须最先加载 -->
+		<script type="text/javascript" src="./js/config.js"></script>
+
+		<!-- API服务 - 在配置脚本之后加载 -->
 		<script type="text/javascript" src="./js/api-service.js"></script>
+
+		<!-- 确保API服务完全加载 -->
+		<script type="text/javascript">
+			// 检查ApiService是否完全加载
+			window.addEventListener('DOMContentLoaded', function() {
+				console.log('检查ApiService是否完全加载...');
+
+				// 延迟检查，确保所有脚本都已加载
+				setTimeout(function() {
+					if (typeof window.ApiService === 'undefined') {
+						console.error('ApiService对象未定义，重新加载api-service.js');
+
+						// 重新加载api-service.js
+						var script = document.createElement('script');
+						script.src = './js/api-service.js';
+						script.type = 'text/javascript';
+						document.head.appendChild(script);
+					} else {
+						console.log('ApiService对象已加载');
+						console.log('ApiService对象的所有方法:', Object.keys(window.ApiService).join(', '));
+
+						// 检查verifyGameData方法是否存在
+						if (typeof window.ApiService.verifyGameData !== 'function') {
+							console.error('ApiService.verifyGameData方法不存在，API服务不完整');
+
+							// 重新加载api-service.js
+							var script = document.createElement('script');
+							script.src = './js/api-service.js';
+							script.type = 'text/javascript';
+							document.head.appendChild(script);
+						} else {
+							console.log('ApiService.verifyGameData方法存在，API服务完整');
+						}
+					}
+				}, 1000);
+			});
+		</script>
 
 		<!-- 游戏脚本 -->
 		<script type="text/javascript" src="./js/game.js"></script>
@@ -38,6 +78,7 @@
 		<script type="text/javascript" src="./js/debug-tools.js"></script>
 		<script type="text/javascript" src="./js/play-button-interceptor.js"></script>
 		<script type="text/javascript" src="./js/TempleRunTokenWithTaxABI_Updated.js"></script>
+		<script type="text/javascript" src="./js/GameTokenBridgeABI.js"></script>
 		<script type="text/javascript" src="./js/web3-token-contract-new.js"></script>
 		<script type="text/javascript" src="./js/token-exchange.js"></script>
 		<script type="text/javascript" src="./js/token-recharge.js"></script>
@@ -59,6 +100,9 @@
 
 		<!-- 原生游戏状态UI -->
 		<script type="text/javascript" src="./js/game-state-ui.js"></script>
+
+		<!-- 游戏验证器 -->
+		<script type="text/javascript" src="./js/game-verifier.js"></script>
 
 		<!-- 代币兑换样式 -->
 		<link rel="stylesheet" href="./js/token-exchange-styles.css">
@@ -217,34 +261,152 @@
 		}, true);
 
 		// 在页面加载完成后初始化钱包管理器
-		window.addEventListener('DOMContentLoaded', function() {
+		window.addEventListener('DOMContentLoaded', async function() {
 			console.log('页面加载完成，初始化组件...');
 
-			// 确保API端点设置正确 - ApiService 现在应始终使用相对路径
-			// if (window.ApiService && typeof window.ApiService.setBaseUrl === 'function') {
-			// 	// window.ApiService.setBaseUrl('http://localhost:9001/api'); // 不再需要强制设置
-			// 	// console.log('API端点已设置为http://localhost:9001/api');
-			// }
+			// 初始化Config，它会自动检测API端点并确保ApiService正确加载
+			if (window.Config && typeof Config.init === 'function') {
+				console.log('初始化Config...');
+				console.log('Config对象:', window.Config);
+				console.log('当前环境:', Config.ENV);
+				console.log('API配置:', Config.getApiConfig());
 
-			// 直接测试API连接，不依赖ApiService对象
-			console.log('测试API连接...');
+				try {
+					// 使用新的init方法，它会自动处理ApiService的加载和初始化
+					const initResult = await Config.init();
+					console.log('Config初始化结果:', initResult ? '成功' : '失败');
 
-			// 使用fetch API直接测试API连接 (使用相对路径)
-			fetch('/health') // 使用相对路径
-				.then(response => {
-					const connected = response.ok;
-					console.log('API健康检查结果:', connected ? '成功' : '失败', '状态码:', response.status);
+					// 检查ApiService对象的完整性
+					if (window.Config.checkApiServiceIntegrity()) {
+						console.log('ApiService对象完整性检查通过');
 
-					if (!connected) {
-						console.warn('API连接测试失败，请确保后端服务器正在运行');
-						WalletProgress.setUseApi(false);
+						// 记录ApiService的状态
+						if (window.ApiService) {
+							console.log('ApiService.baseUrl:', ApiService.baseUrl);
+							console.log('ApiService方法:', Object.keys(ApiService).join(', '));
+
+							// 检查verifyGameData方法是否存在
+							if (typeof ApiService.verifyGameData === 'function') {
+								console.log('verifyGameData方法可用');
+							} else {
+								console.error('verifyGameData方法不可用');
+							}
+						}
 					} else {
-						WalletProgress.setUseApi(connected);
+						console.error('ApiService对象完整性检查失败');
+
+						// 尝试使用备用方法
+						console.log('尝试使用备用方法...');
+
+						// 定义一个备用的verifyGameData方法
+						if (window.ApiService && typeof ApiService.verifyGameData !== 'function') {
+							console.log('添加备用的verifyGameData方法');
+							ApiService.verifyGameData = async function(walletAddress, gameCoins, verification) {
+								console.log('使用备用的verifyGameData方法');
+								console.log('参数:', { walletAddress, gameCoins, verification });
+
+								try {
+									const url = '/api/verify-game-data';
+									console.log('验证游戏数据URL:', url);
+
+									const response = await fetch(url, {
+										method: 'POST',
+										headers: {
+											'Content-Type': 'application/json'
+										},
+										body: JSON.stringify({
+											walletAddress,
+											gameCoins,
+											verification
+										})
+									});
+
+									if (!response.ok) {
+										const errorData = await response.json();
+										throw new Error(errorData.error || '验证游戏数据失败');
+									}
+
+									const data = await response.json();
+									console.log('验证游戏数据成功:', data);
+
+									return data;
+								} catch (error) {
+									console.error('验证游戏数据出错:', error.message);
+									return { success: false, error: error.message || '验证游戏数据时出错' };
+								}
+							};
+
+							console.log('备用的verifyGameData方法已添加');
+						}
 					}
-				})
-				.catch(error => {
-					console.error('API健康检查请求失败:', error);
-				});
+				} catch (error) {
+					console.error('Config初始化出错:', error);
+
+					// 如果初始化失败，尝试使用备用方法
+					console.warn('Config初始化失败，尝试使用备用方法');
+
+					// 尝试直接加载ApiService
+					if (typeof window.ApiService === 'undefined') {
+						console.log('尝试直接加载ApiService...');
+
+						// 创建script元素
+						const script = document.createElement('script');
+						script.src = './js/api-service.js';
+						script.type = 'text/javascript';
+
+						// 使用Promise等待脚本加载完成
+						await new Promise((resolve, reject) => {
+							script.onload = resolve;
+							script.onerror = reject;
+							document.head.appendChild(script);
+						}).catch(err => {
+							console.error('加载ApiService失败:', err);
+						});
+
+						// 检查ApiService是否已加载
+						if (typeof window.ApiService !== 'undefined') {
+							console.log('ApiService已加载');
+
+							// 设置baseUrl
+							if (typeof ApiService.setBaseUrl === 'function') {
+								ApiService.setBaseUrl('/api');
+								console.log('已设置ApiService.baseUrl = /api');
+							}
+						}
+					}
+				}
+			} else {
+				console.error('Config对象不存在或init方法不可用');
+				console.error('window对象上的所有属性:', Object.keys(window).join(', '));
+
+				// 如果Config对象不存在，尝试直接初始化ApiService
+				if (typeof window.ApiService !== 'undefined') {
+					console.log('尝试直接初始化ApiService...');
+
+					// 设置baseUrl
+					if (typeof ApiService.setBaseUrl === 'function') {
+						ApiService.setBaseUrl('/api');
+						console.log('已设置ApiService.baseUrl = /api');
+					}
+
+					// 测试API连接
+					if (typeof ApiService.testConnection === 'function') {
+						try {
+							const connected = await ApiService.testConnection();
+							console.log('API连接测试结果:', connected ? '成功' : '失败');
+
+							// 设置WalletProgress.useApi
+							if (window.WalletProgress && typeof WalletProgress.setUseApi === 'function') {
+								WalletProgress.setUseApi(connected);
+							}
+						} catch (error) {
+							console.error('API连接测试出错:', error);
+						}
+					}
+				} else {
+					console.error('ApiService对象未定义，无法初始化');
+				}
+			}
 
 			// 初始化钱包进度管理器
 			WalletProgress.init();

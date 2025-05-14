@@ -27,8 +27,10 @@ const WalletProgress = {
                         this.useApi = false;
                     } else {
                         console.log('API连接测试成功，将使用后端存储');
-                        // 连接成功后，尝试同步本地数据到后端
-                        this.syncLocalDataToBackend();
+                        // 连接成功后，从后端获取数据
+                        if (WalletManager.isConnected()) {
+                            this.syncDataFromBackend();
+                        }
                     }
                 })
                 .catch(error => {
@@ -36,100 +38,6 @@ const WalletProgress = {
                     console.warn('由于API连接测试出错，将使用本地存储');
                     this.useApi = false;
                 });
-        }
-    },
-
-    // 强制同步本地数据到后端
-    syncLocalDataToBackend: async function() {
-        if (!this.useApi || !WalletManager.isConnected()) {
-            console.log('不同步本地数据到后端：API未启用或钱包未连接');
-            return false;
-        }
-
-        const walletAddress = WalletManager.getAccount();
-        console.log('强制同步本地数据到后端，钱包地址:', walletAddress);
-
-        try {
-            // 收集三个关键数据
-            const localData = {
-                coins: 0,           // 当前可用金币 (com.gemioli.tombrunner.coins)
-                highScore: 0,       // 累计获得金币 (com.gemioli.tombrunner.highscore)
-                lastScore: 0,       // 历史最高得分 (com.gemioli.tombrunner.score)
-                lastUpdated: new Date().toISOString()
-            };
-
-            // 获取当前可用金币 (com.gemioli.tombrunner.coins)
-            try {
-                const savedCoins = localStorage.getItem('com.gemioli.tombrunner.coins');
-
-                if (savedCoins) {
-                    localData.coins = parseInt(savedCoins, 10);
-                    console.log('从本地存储获取当前可用金币:', localData.coins);
-                }
-            } catch (error) {
-                console.error('获取本地金币数据时出错:', error);
-            }
-
-            // 获取累计获得金币 (com.gemioli.tombrunner.highscore)
-            try {
-                const savedHighScore = localStorage.getItem('com.gemioli.tombrunner.highscore');
-
-                if (savedHighScore) {
-                    localData.highScore = parseInt(savedHighScore, 10);
-                    console.log('从本地存储获取累计获得金币:', localData.highScore);
-                }
-            } catch (error) {
-                console.error('获取本地累计获得金币数据时出错:', error);
-            }
-
-            // 注意：我们不再使用maxCoins参数，因为它不存在
-            // 在游戏中，com.gemioli.tombrunner.highscore实际上存储的是累计获得金币
-            // 统一使用highScore参数表示累计获得金币
-
-            // 获取历史最高得分 (com.gemioli.tombrunner.score)
-            try {
-                const savedLastScore = localStorage.getItem('com.gemioli.tombrunner.score');
-
-                if (savedLastScore) {
-                    localData.lastScore = parseInt(savedLastScore, 10);
-                    console.log('从本地存储获取历史最高得分:', localData.lastScore);
-                }
-            } catch (error) {
-                console.error('获取本地历史最高得分数据时出错:', error);
-            }
-
-            // 不再获取游戏进度和成就数据，只关注三个关键数据
-
-            // 保存数据到后端
-            console.log('将本地数据同步到后端:', localData);
-
-            try {
-                // 使用ApiService构建URL，确保使用正确的端点
-                const url = ApiService.buildApiUrl(`/user/${walletAddress}`);
-                console.log('同步数据URL:', url);
-                
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(localData)
-                });
-
-                if (response.ok) {
-                    console.log('本地数据成功同步到后端');
-                    return true;
-                } else {
-                    console.error('本地数据同步到后端失败，状态码:', response.status);
-                    return false;
-                }
-            } catch (error) {
-                console.error('同步数据到后端时出错:', error);
-                return false;
-            }
-        } catch (error) {
-            console.error('同步本地数据到后端时出错:', error);
-            return false;
         }
     },
 
@@ -149,7 +57,7 @@ const WalletProgress = {
                 // 使用ApiService构建URL，确保使用正确的端点
                 const url = ApiService.buildApiUrl(`/user/${walletAddress}`);
                 console.log('获取用户数据URL:', url);
-                
+
                 const response = await fetch(url);
 
                 if (!response.ok) {

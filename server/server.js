@@ -8,11 +8,17 @@ const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
-const { generateExchangeSignature, generateRechargeSignature, verifySignature, GAME_SERVER_ADDRESS } = require('./sign-exchange');
+const {
+    generateExchangeSignature,
+    generateRechargeSignature,
+    verifySignature,
+    GAME_SERVER_ADDRESS
+} = require('./sign-exchange');
+const GameVerifier = require('./game-verifier');
 
 // 创建Express应用
 const app = express();
-const PORT = 9001; // 固定端口为9001
+const PORT = 9000; // 修改端口为9000，与前端一致
 
 // 数据存储目录
 const DATA_DIR = path.join(__dirname, 'data');
@@ -438,6 +444,25 @@ app.get('/api/user/:walletAddress/tokens', (req, res) => {
         console.error(`获取用户代币余额出错: ${error.message}`);
         res.status(500).json({ error: '获取用户代币余额时出错' });
     }
+});
+
+/**
+ * 获取用户代币余额（使用代币持有者地址）- 已弃用，现在使用Web3合约直接获取
+ * GET /api/token-balance/:walletAddress/:tokenHolderAddress
+ */
+app.get('/api/token-balance/:walletAddress/:tokenHolderAddress', (req, res) => {
+    const { walletAddress, tokenHolderAddress } = req.params;
+    console.log(`[已弃用] 获取用户代币余额 - 钱包地址: ${walletAddress}, 代币持有者地址: ${tokenHolderAddress}`);
+    console.log('此API端点已弃用，请使用Web3合约直接获取代币余额');
+
+    // 返回0作为余额
+    res.status(200).json({
+        walletAddress,
+        tokenHolderAddress,
+        balance: 0,
+        deprecated: true,
+        message: '此API端点已弃用，请使用Web3合约直接获取代币余额'
+    });
 });
 
 /**
@@ -1052,9 +1077,110 @@ function isValidWalletAddress(address) {
     return isValid;
 }
 
+
+
+/**
+ * 验证游戏数据校验码
+ * POST /api/verify-game-data
+ * 请求体: { walletAddress, gameCoins, verification }
+ */
+app.post('/api/verify-game-data', (req, res) => {
+    console.log('收到游戏数据验证请求:', req.body);
+
+    const { walletAddress, gameCoins, verification } = req.body;
+
+    // 验证参数
+    if (!walletAddress) {
+        return res.status(400).json({ success: false, error: '钱包地址不能为空' });
+    }
+
+    if (gameCoins === undefined || gameCoins < 0) {
+        return res.status(400).json({ success: false, error: '游戏金币数量无效' });
+    }
+
+    if (!verification || !verification.code || !verification.timestamp) {
+        return res.status(400).json({ success: false, error: '验证数据无效' });
+    }
+
+    try {
+        // 验证钱包地址格式
+        if (!isValidWalletAddress(walletAddress)) {
+            return res.status(400).json({ success: false, error: '无效的钱包地址格式' });
+        }
+
+        // 验证校验码
+        const verificationData = {
+            code: verification.code,
+            wallet: walletAddress.toLowerCase(),
+            coins: gameCoins,
+            timestamp: verification.timestamp
+        };
+
+        const isValid = GameVerifier.verifyCode(verificationData);
+
+        if (!isValid) {
+            console.error('校验码验证失败');
+            return res.status(400).json({
+                success: false,
+                error: '校验码验证失败，游戏数据可能被篡改'
+            });
+        }
+
+        // 获取用户数据文件路径
+        const filePath = getUserDataPath(walletAddress);
+
+        // 读取现有用户数据
+        let userData = {};
+        if (fs.existsSync(filePath)) {
+            userData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        }
+
+        // 更新金币
+        const oldCoins = userData.coins || 0;
+        userData.coins = oldCoins + gameCoins;
+        console.log(`添加用户金币 ${gameCoins}，从 ${oldCoins} 变为 ${userData.coins}`);
+
+        // 更新累计获得金币
+        userData.highScore = (userData.highScore || 0) + gameCoins;
+        console.log(`更新用户累计获得金币: ${userData.highScore}`);
+
+        // 添加时间戳
+        userData.lastUpdated = new Date().toISOString();
+
+        // 保存更新后的数据
+        fs.writeFileSync(filePath, JSON.stringify(userData, null, 2));
+
+        // 返回结果
+        res.status(200).json({
+            success: true,
+            coins: userData.coins,
+            highScore: userData.highScore,
+            message: '校验成功，金币已更新'
+        });
+    } catch (error) {
+        console.error('验证游戏数据出错:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || '验证游戏数据时出错'
+        });
+    }
+});
+
+// 设置静态文件服务
+// 注意：静态文件服务应该放在所有API路由之后
+// 使用上一级目录（项目根目录）作为静态文件目录
+app.use(express.static(path.join(__dirname, '..')));
+
+// 设置默认首页
+app.get('/', (_, res) => {
+    res.sendFile(path.join(__dirname, '..', 'index.html'));
+});
+
 // 启动服务器
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`服务器已启动，监听 0.0.0.0:${PORT}`);
     console.log(`数据存储目录: ${DATA_DIR}`);
     console.log(`游戏服务器地址: ${GAME_SERVER_ADDRESS}`);
+    console.log(`静态文件目录: ${path.join(__dirname, '..')}`);
+    console.log(`访问地址: http://localhost:${PORT}`);
 });
