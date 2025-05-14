@@ -543,7 +543,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 创建说明
             const description = document.createElement('p');
-            description.textContent = '请选择连接方式:';
+            description.innerHTML = '在dapp里可直接连接<br>请选择连接方式:';
             description.style.cssText = 'margin-bottom: 20px; line-height: 1.5;';
 
             // 创建imToken按钮（优先显示）
