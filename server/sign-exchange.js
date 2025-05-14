@@ -229,7 +229,9 @@ async function generateRechargeSignature(playerAddress, tokenAmount, gameCoins, 
         const tokenAmountInWei = ethers.utils.parseEther(tokenAmount.toString());
         console.log('代币数量(wei):', tokenAmountInWei.toString());
 
-        // 创建消息哈希 - 按照合约中rechargeGameCoins函数的格式
+        // 创建消息哈希 - 按照合约中_verifyRechargeSignature函数的格式
+        // 合约中的代码是:
+        // bytes32 messageHash = keccak256(abi.encodePacked(player, tokenAmount, gameCoins, nonce, address(this), "recharge"));
         const messageHash = ethers.utils.keccak256(
             ethers.utils.solidityPack(
                 ['address', 'uint256', 'uint256', 'bytes32', 'address', 'string'],
@@ -324,6 +326,8 @@ async function verifySignature(playerAddress, tokenAmount, gameCoins, nonce, con
         };
     }
 }
+
+
 
 module.exports = {
     generateExchangeSignature,

@@ -3,19 +3,29 @@
  * 用于与后端服务器通信，保存和获取用户数据
  */
 const ApiService = {
-    // API基础URL - 始终使用相对路径，由开发服务器或Nginx代理
-    baseUrl: '', // 留空或移除，下面直接构造相对路径
+    // API基础URL - 将由Config.init()动态设置
+    baseUrl: '/api', // 默认值，将被Config.init()覆盖
 
-    // 设置API基础URL (保留，但不推荐使用，因为baseUrl现在应始终为空)
+    // 设置API基础URL
     setBaseUrl: function(url) {
         this.baseUrl = url;
-        console.log('API基础URL已设置为:', url);
+        console.log('ApiService: 设置API基础URL为', url);
     },
 
-    // 构建API URL的辅助方法 - 始终返回 /api/... 相对路径
+    // 构建API URL的辅助方法 - 使用baseUrl
     buildApiUrl: function(path) {
         const apiPath = path.startsWith('/') ? path : `/${path}`;
-        // 确保最终路径以 /api/ 开头，避免重复
+
+        // 如果baseUrl已设置，使用baseUrl
+        if (this.baseUrl) {
+            // 确保不重复添加/api前缀
+            if (apiPath.startsWith('/api/')) {
+                return this.baseUrl.replace('/api', '') + apiPath;
+            }
+            return this.baseUrl + apiPath;
+        }
+
+        // 如果baseUrl未设置，使用相对路径（向后兼容）
         if (apiPath.startsWith('/api/')) {
             return apiPath;
         }
@@ -310,49 +320,154 @@ const ApiService = {
         return userData?.achievements || [];
     },
 
+    // 验证游戏数据并更新金币
+    verifyGameData: async function(walletAddress, gameCoins, verification) {
+        if (!walletAddress) {
+            console.error('验证游戏数据失败: 钱包地址为空');
+            return { success: false, error: '钱包地址为空' };
+        }
+
+        if (typeof gameCoins !== 'number' || gameCoins < 0) {
+            console.error('验证游戏数据失败: 无效的游戏金币数量');
+            return { success: false, error: '无效的游戏金币数量' };
+        }
+
+        if (!verification || !verification.code || !verification.timestamp) {
+            console.error('验证游戏数据失败: 无效的验证数据');
+            return { success: false, error: '无效的验证数据' };
+        }
+
+        try {
+            const url = this.buildApiUrl('/verify-game-data');
+            console.log('验证游戏数据URL:', url);
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    walletAddress,
+                    gameCoins,
+                    verification
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || '验证游戏数据失败');
+            }
+
+            const data = await response.json();
+            console.log('验证游戏数据成功:', data);
+
+            return data;
+        } catch (error) {
+            console.error('验证游戏数据出错:', error.message);
+            return { success: false, error: error.message || '验证游戏数据时出错' };
+        }
+    },
+
     // 测试API连接
     testConnection: async function() {
         try {
-            // 始终使用相对路径 /health
-            const testUrl = '/health';
-            console.log('测试API连接，URL:', testUrl);
+            // 如果Config对象存在，使用Config的端点检测功能
+            if (window.Config && typeof Config.detectApiEndpoint === 'function') {
+                console.log('使用Config.detectApiEndpoint检测API端点...');
+                const apiUrl = await Config.detectApiEndpoint();
 
-            // 添加超时设置，避免长时间等待
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+                // 更新ApiService的baseUrl
+                this.setBaseUrl(apiUrl);
+                console.log('API基础URL已更新为:', apiUrl);
 
-            try {
-                const response = await fetch(testUrl, {
-                    signal: controller.signal,
-                    // 添加缓存控制，避免使用缓存的结果
-                    headers: {
-                        'Cache-Control': 'no-cache, no-store, must-revalidate',
-                        'Pragma': 'no-cache',
-                        'Expires': '0'
+                // 构建健康检查URL
+                const healthUrl = apiUrl.includes('://')
+                    ? apiUrl.replace('/api', '/health')
+                    : '/health';
+
+                console.log('测试API连接，URL:', healthUrl);
+
+                // 添加超时设置
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+
+                try {
+                    const response = await fetch(healthUrl, {
+                        signal: controller.signal,
+                        headers: {
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache',
+                            'Expires': '0'
+                        }
+                    });
+
+                    // 清除超时
+                    clearTimeout(timeoutId);
+
+                    if (!response.ok) {
+                        console.error('API连接测试失败，状态码:', response.status);
+                        return false;
                     }
-                });
 
-                // 清除超时
-                clearTimeout(timeoutId);
+                    const data = await response.json();
+                    console.log('API连接测试成功:', data);
+                    return true;
+                } catch (fetchError) {
+                    // 清除超时
+                    clearTimeout(timeoutId);
 
-                if (!response.ok) {
-                    console.error('API连接测试失败，状态码:', response.status);
+                    if (fetchError.name === 'AbortError') {
+                        console.error('API连接测试超时');
+                    } else {
+                        console.error('API连接测试出错:', fetchError.message);
+                    }
                     return false;
                 }
+            } else {
+                // 如果Config对象不存在，使用默认的健康检查
+                console.log('Config对象不存在，使用默认健康检查...');
 
-                const data = await response.json();
-                console.log('API连接测试成功:', data);
-                return true;
-            } catch (fetchError) {
-                // 清除超时
-                clearTimeout(timeoutId);
+                // 始终使用相对路径 /health
+                const testUrl = '/health';
+                console.log('测试API连接，URL:', testUrl);
 
-                if (fetchError.name === 'AbortError') {
-                    console.error('API连接测试超时');
-                } else {
-                    console.error('API连接测试出错:', fetchError.message);
+                // 添加超时设置，避免长时间等待
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+
+                try {
+                    const response = await fetch(testUrl, {
+                        signal: controller.signal,
+                        // 添加缓存控制，避免使用缓存的结果
+                        headers: {
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache',
+                            'Expires': '0'
+                        }
+                    });
+
+                    // 清除超时
+                    clearTimeout(timeoutId);
+
+                    if (!response.ok) {
+                        console.error('API连接测试失败，状态码:', response.status);
+                        return false;
+                    }
+
+                    const data = await response.json();
+                    console.log('API连接测试成功:', data);
+                    return true;
+                } catch (fetchError) {
+                    // 清除超时
+                    clearTimeout(timeoutId);
+
+                    if (fetchError.name === 'AbortError') {
+                        console.error('API连接测试超时');
+                    } else {
+                        console.error('API连接测试出错:', fetchError.message);
+                    }
+                    return false;
                 }
-                return false;
             }
         } catch (error) {
             console.error('API连接测试出错:', error.message);
@@ -411,30 +526,10 @@ const ApiService = {
         }
     },
 
-    // 获取用户代币余额
-    getTokenBalance: async function(walletAddress) {
-        if (!walletAddress) {
-            console.error('获取用户代币余额失败: 钱包地址为空');
-            return 0;
-        }
-
-        try {
-            const url = this.buildApiUrl(`/user/${walletAddress}/tokens`);
-            console.log('获取用户代币余额URL:', url);
-            const response = await fetch(url);
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || '获取用户代币余额失败');
-            }
-
-            const data = await response.json();
-            console.log('获取用户代币余额成功:', data);
-            return data.tokens || 0;
-        } catch (error) {
-            console.error('获取用户代币余额出错:', error.message);
-            return 0;
-        }
+    // 获取用户代币余额 - 已弃用，现在使用Web3合约直接获取
+    getTokenBalance: async function(_) {
+        console.warn('ApiService.getTokenBalance方法已弃用，请使用Web3TokenContract.getBalance方法');
+        return 0;
     },
 
     // 兑换代币
@@ -694,6 +789,14 @@ const ApiService = {
         }
 
         try {
+            // 注意：这里的参数顺序必须与合约中的_verifyRechargeSignature函数匹配
+            // 合约中的参数顺序是: player, tokenAmount, gameCoins, nonce, address(this), "recharge"
+            console.log('准备获取充值签名...');
+            console.log('- 玩家地址:', playerAddress);
+            console.log('- 代币数量:', tokenAmount);
+            console.log('- 游戏金币:', gameCoins);
+            console.log('- 合约地址:', contractAddress);
+
             const url = this.buildApiUrl(`/sign-recharge`);
             console.log('API请求URL:', url);
             console.log('请求方法: POST');
@@ -733,10 +836,30 @@ const ApiService = {
             const result = await response.json();
             console.log('获取充值签名成功:', result);
 
+            // 添加更多调试信息
+            if (result.signature) {
+                console.log('- 签名长度:', result.signature.length);
+                console.log('- 签名前10个字符:', result.signature.substring(0, 10) + '...');
+                console.log('- 签名后10个字符:', '...' + result.signature.substring(result.signature.length - 10));
+            }
+
+            if (result.nonce) {
+                console.log('- Nonce:', result.nonce);
+            }
+
+            if (result.signer) {
+                console.log('- 签名者地址:', result.signer);
+                console.log('- 是否与游戏服务器地址匹配:',
+                    typeof GameConfig !== 'undefined' &&
+                    GameConfig.TOKEN_EXCHANGE &&
+                    GameConfig.TOKEN_EXCHANGE.GAME_SERVER_ADDRESS === result.signer);
+            }
+
             return {
                 success: true,
                 signature: result.signature,
                 nonce: result.nonce,
+                signer: result.signer,
                 message: '获取充值签名成功'
             };
         } catch (error) {

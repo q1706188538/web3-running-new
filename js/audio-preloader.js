@@ -16,6 +16,8 @@ const AudioPreloader = {
 
         // 检测移动设备
         this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        // 专门检测iOS设备
+        this.isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
         // 根据设备类型选择音频文件
         this.selectAudioFiles();
@@ -48,7 +50,7 @@ const AudioPreloader = {
                 this.replaceSoundLoader();
             }
         }
-        
+
         // 确保 sound atlas (sounds.js) 被加载
         // 我们需要 GEMIOLI.SoundLoader.loadAtlas 已经被我们的 shim 替换
         if (typeof GEMIOLI !== 'undefined' && GEMIOLI.SoundLoader && typeof GEMIOLI.SoundLoader.loadAtlas === 'function') {
@@ -86,6 +88,8 @@ const AudioPreloader = {
             document.addEventListener('touchstart', this.unlockAudioHandler.bind(this), { once: true });
             // console.log('Added touchstart listener for audio unlock.');
         }
+        // 为所有设备添加 touchstart 监听器，以确保在触摸屏PC上也能解锁
+        document.addEventListener('touchstart', this.unlockAudioHandler.bind(this), { once: true });
         // 为所有设备（包括 PC）添加 mousedown 监听器
         document.addEventListener('mousedown', this.unlockAudioHandler.bind(this), { once: true });
         // console.log('Added mousedown listener for audio unlock.');
@@ -377,7 +381,7 @@ const AudioPreloader = {
                             // } else {
                             //     console.log(`[SoundInstance.play] For "${this._name}". IsMuted: ${GEMIOLI.SoundLoader._isMuted}. Loop: ${this._loop}. Current _activeSource state: ${activeSourceState}`);
                             // }
-                            
+
                             if (this._activeSource && typeof this._activeSource.stop === 'function') {
                                 if (this._loop) {
                                     // 对于循环音效，如果已经在播放，则忽略新的播放请求。
@@ -389,7 +393,7 @@ const AudioPreloader = {
                                     this.stop(); // stop() 方法会负责将 this._activeSource 置为 null
                                 }
                             }
-                            
+
                             // console.log(`[SoundInstance.play] For "${this._name}", proceeding to call AudioPreloader.playSound. Final this._loop: ${this._loop}`);
                             if (!GEMIOLI.SoundLoader._isMuted) {
                                 AudioPreloader.playSound(this._name, this); // 传递 soundInstance 以便 playSound 可以设置 _activeSource
@@ -482,7 +486,7 @@ const AudioPreloader = {
                                         duration: item.e - item.s
                                     };
                                 });
-                                
+
                                 if (typeof GEMIOLI !== 'undefined') {
                                     GEMIOLI.Sounds = processedSounds;
                                     // console.log('GEMIOLI.Sounds populated by shimmed loadAtlas:', GEMIOLI.Sounds);
@@ -528,11 +532,12 @@ const AudioPreloader = {
 
     // 播放音效
     playSound: function(name, soundInstanceRef) { // 接收 soundInstanceRef
+
         // 详细记录传入的参数
         const soundInstanceName = soundInstanceRef && soundInstanceRef._name ? soundInstanceRef._name : "UnknownInstance";
         // const soundInstanceLoopState = soundInstanceRef && typeof soundInstanceRef._loop === 'boolean' ? soundInstanceRef._loop : "N/A";
         // const soundInstanceVolume = soundInstanceRef && typeof soundInstanceRef.volume !== 'undefined' ? soundInstanceRef.volume : "N/A";
-        
+
         // console.log(`[AudioPreloader.playSound ENTRY] Requested name: "${name}"
     // - soundInstanceRef._name: "${soundInstanceName}"
     // - soundInstanceRef._loop: ${soundInstanceLoopState}
@@ -542,7 +547,7 @@ const AudioPreloader = {
         // 检查 AudioContext 是否已成功激活
         if (!this.audioContext || this.audioContext.state !== 'running') {
             console.warn(`AudioContext not running or not available. Cannot play sound: ${name}. State: ${this.audioContext ? this.audioContext.state : 'undefined'}`);
-            if (this.isMobile && this.audioContext && this.audioContext.state === 'suspended') {
+            if (this.audioContext && this.audioContext.state === 'suspended') {
                 // console.log(`AudioContext is suspended while trying to play "${name}", attempting to unlock.`);
                 this.unlockAudio();
             }
@@ -561,7 +566,7 @@ const AudioPreloader = {
 
         // 尝试播放音效
         try {
-            if (this.isMobile && this.audioContext) {
+            if (this.audioContext) { // 移除isMobile条件，对所有设备使用相同处理
                 let audioBufferToPlay = null;
                 let soundPath = '';
 
@@ -581,9 +586,9 @@ const AudioPreloader = {
                     const duration = soundData ? soundData.duration : (audioBufferToPlay ? audioBufferToPlay.duration : 0); // Fallback to full duration
 
                     const loop = soundInstanceRef && typeof soundInstanceRef._loop === 'boolean' ? soundInstanceRef._loop : false;
-                    
+
                     // console.log(`[AudioPreloader.playSound INTERNAL] Effective name: "${name}", InstanceName: "${soundInstanceName}", Effective loop: ${loop}, Offset: ${offset}, Duration: ${duration}, Path: ${soundPath}, SoundDataFound: ${!!soundData}`);
-                    
+
                     const source = this.audioContext.createBufferSource();
                     source.buffer = audioBufferToPlay;
                     source.connect(this.audioContext.destination);
@@ -601,7 +606,7 @@ const AudioPreloader = {
                     } else {
                         console.warn(`[AudioPreloader.playSound] soundInstanceRef is null for "${name}", cannot assign _activeSource.`);
                     }
-                    
+
                     source.onended = () => {
                         const currentInstanceName = soundInstanceRef && soundInstanceRef._name ? soundInstanceRef._name : "UnknownInstanceOnEnd";
                         // console.log(`[onended-fallback] Event triggered for requested name "${name}" (Instance: "${currentInstanceName}", loop: ${loop}). Path: ${soundPath}`);
@@ -641,7 +646,7 @@ const AudioPreloader = {
                     // console.warn(`[AudioPreloader.playSound EXIT] Conditions not met for playing "${name}".`);
                 }
             } else {
-                console.warn(`Not on mobile or AudioContext not available. Playback for "${name}" might not work or use fallback.`);
+                console.warn(`AudioContext not available. Cannot play sound: ${name}.`);
                 // console.warn(`[AudioPreloader.playSound EXIT] Conditions not met for playing "${name}".`);
             }
         } catch (error) {
@@ -734,10 +739,10 @@ const AudioPreloader = {
                     // console.log('Closing previous AudioContext before recreating. State:', this.audioContext.state);
                     await this.audioContext.close().catch(e => console.warn('Error closing previous AudioContext:', e));
                 }
-                
+
                 this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 // console.log('New AudioContext created. Initial state:', this.audioContext.state);
-                
+
                 // After creating, it might still be suspended and need a resume.
                 if (this.audioContext.state === 'suspended') {
                     // console.log('Newly created AudioContext is suspended, attempting to resume it...');

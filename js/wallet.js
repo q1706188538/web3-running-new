@@ -255,7 +255,7 @@ const WalletManager = {
 
         // 创建标题
         const title = document.createElement('h1');
-        title.textContent = '神庙逃亡';
+        title.textContent = 'Running';
         title.style.cssText = 'font-size: 36px; margin-bottom: 20px; color: #f5a623;';
 
         // 创建说明文本
@@ -2354,14 +2354,9 @@ const WalletManager = {
             } else if (syncResult) {
                 console.log('数据同步成功，无需创建新用户数据');
             } else {
-                // 如果API不可用或同步失败，尝试将本地数据同步到后端
-                console.log('尝试将本地数据同步到后端...');
-                const syncToBackendResult = await WalletProgress.syncLocalDataToBackend();
-                if (syncToBackendResult) {
-                    console.log('本地数据成功同步到后端');
-                } else {
-                    console.log('本地数据同步到后端失败或无需同步');
-                }
+                // API不可用或同步失败，记录日志
+                console.log('API不可用或同步失败，将使用本地数据');
+                // 不再尝试将本地数据同步到后端，因为这可能导致数据被篡改
             }
         } catch (error) {
             console.error('登录后数据同步出错:', error);

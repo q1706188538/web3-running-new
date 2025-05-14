@@ -136,6 +136,16 @@ const WalletGameIntegration = {
             if (WalletProgress.useApi) {
                 if (window.DEBUG_MODE) console.log('API已启用，直接从后端获取数据并更新...');
 
+                // 获取当前钱包地址
+                const walletAddress = WalletManager.getAccount();
+                if (!walletAddress) {
+                    console.error('无法获取钱包地址，无法上传游戏数据');
+                    this.showWalletMessage('无法获取钱包地址，请重新连接钱包', 5000);
+                    return;
+                }
+
+                console.log('当前钱包地址:', walletAddress);
+
                 // 从后端获取当前用户数据
                 const self = this; // 保存this引用，在Promise回调中使用
 
@@ -176,45 +186,204 @@ const WalletGameIntegration = {
                         console.log('本次游戏得分:', currentGameScore);
                         console.log('======= 金币计算数据结束 =======');
 
-                        // 准备要更新的数据
-                        const updatedData = {
-                            coins: totalCoins,
-                            highScore: newHighScore,  // 累计获得金币
-                            lastScore: newLastScore,  // 最高得分
-                            progress: {
-                                level: event.level || 1,
-                                distance: event.distance || currentGameScore,
-                                lastScore: newLastScore,  // 确保progress中的lastScore与顶层一致
-                                coins: currentGameCoins   // 本次游戏获得的金币
-                            },
-                            lastUpdated: new Date().toISOString()
+                        // 确保ApiService对象存在
+                        if (typeof window.ApiService === 'undefined') {
+                            console.error('ApiService对象未定义');
+                            console.error('window对象上的所有属性:', Object.keys(window).join(', '));
+
+                            // 创建一个临时的ApiService对象
+                            console.log('创建临时ApiService对象...');
+                            window.ApiService = {
+                                baseUrl: '/api',
+                                verifyGameData: async function(walletAddress, gameCoins, verification) {
+                                    console.log('使用临时ApiService.verifyGameData方法');
+                                    console.log('参数:', { walletAddress, gameCoins, verification });
+
+                                    try {
+                                        const url = '/api/verify-game-data';
+                                        console.log('验证游戏数据URL:', url);
+
+                                        const response = await fetch(url, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json'
+                                            },
+                                            body: JSON.stringify({
+                                                walletAddress,
+                                                gameCoins,
+                                                verification
+                                            })
+                                        });
+
+                                        if (!response.ok) {
+                                            const errorData = await response.json();
+                                            throw new Error(errorData.error || '验证游戏数据失败');
+                                        }
+
+                                        const data = await response.json();
+                                        console.log('验证游戏数据成功:', data);
+
+                                        return data;
+                                    } catch (error) {
+                                        console.error('验证游戏数据出错:', error.message);
+                                        return { success: false, error: error.message || '验证游戏数据时出错' };
+                                    }
+                                }
+                            };
+
+                            console.log('临时ApiService对象已创建');
+                        }
+
+                        // 检查ApiService对象的所有方法
+                        console.log('ApiService对象的所有方法:', Object.keys(window.ApiService).join(', '));
+
+                        // 特别检查verifyGameData方法
+                        if (typeof window.ApiService.verifyGameData !== 'function') {
+                            console.error('ApiService.verifyGameData方法不可用');
+                            console.error('ApiService对象类型:', typeof window.ApiService);
+                            console.error('ApiService是否为数组:', Array.isArray(window.ApiService));
+                            console.error('ApiService.verifyGameData类型:', typeof window.ApiService.verifyGameData);
+
+                            // 添加verifyGameData方法
+                            console.log('添加verifyGameData方法到ApiService对象...');
+
+                            ApiService.verifyGameData = async function(walletAddress, gameCoins, verification) {
+                                console.log('使用动态添加的verifyGameData方法');
+                                console.log('参数:', { walletAddress, gameCoins, verification });
+
+                                try {
+                                    const url = '/api/verify-game-data';
+                                    console.log('验证游戏数据URL:', url);
+
+                                    const response = await fetch(url, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify({
+                                            walletAddress,
+                                            gameCoins,
+                                            verification
+                                        })
+                                    });
+
+                                    if (!response.ok) {
+                                        const errorData = await response.json();
+                                        throw new Error(errorData.error || '验证游戏数据失败');
+                                    }
+
+                                    const data = await response.json();
+                                    console.log('验证游戏数据成功:', data);
+
+                                    return data;
+                                } catch (error) {
+                                    console.error('验证游戏数据出错:', error.message);
+                                    return { success: false, error: error.message || '验证游戏数据时出错' };
+                                }
+                            };
+
+                            console.log('verifyGameData方法已添加到ApiService对象');
+                        }
+
+                        // 定义一个函数，用于处理验证游戏数据
+                        const processGameVerification = function(verificationData) {
+                            console.log('生成的校验数据:', verificationData);
+
+                            // 如果ApiService.verifyGameData方法不可用，使用fetch API
+                            if (typeof window.ApiService.verifyGameData !== 'function') {
+                                console.log('ApiService.verifyGameData方法不可用，使用fetch API发送验证请求');
+
+                                const verifyUrl = `/api/verify-game-data`;
+                                return fetch(verifyUrl, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        walletAddress,
+                                        gameCoins: currentGameCoins,
+                                        verification: verificationData
+                                    })
+                                })
+                                .then(response => {
+                                    console.log('验证请求响应状态:', response.status);
+                                    if (response.ok) {
+                                        return response.json();
+                                    } else {
+                                        throw new Error(`验证游戏数据失败，状态码: ${response.status}`);
+                                    }
+                                })
+                                .then(result => {
+                                    if (result.success) {
+                                        console.log('成功验证游戏数据并更新金币');
+                                        self.showWalletMessage('数据已验证并同步到后端', 3000);
+
+                                        // 如果是新的最高得分，显示祝贺消息
+                                        if (isNewLastScore) {
+                                            self.showWalletMessage('恭喜！新的最高得分: ' + currentGameScore);
+                                        }
+
+                                        return result;
+                                    } else {
+                                        console.error('验证游戏数据失败:', result.error);
+                                        self.showWalletMessage('数据验证失败: ' + (result.error || '未知错误'), 5000);
+                                        return false;
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('验证游戏数据时出错:', error);
+                                    self.showWalletMessage('验证游戏数据时出错: ' + error.message, 5000);
+                                    return false;
+                                });
+                            } else {
+                                // 使用ApiService.verifyGameData方法
+                                console.log('使用ApiService.verifyGameData方法验证游戏数据');
+                                return ApiService.verifyGameData(walletAddress, currentGameCoins, verificationData);
+                            }
                         };
 
-                        // 更新后端数据
-                        return WalletProgress.updateUserData(updatedData)
-                            .then(updateSuccess => {
-                                if (updateSuccess) {
-                                    if (window.DEBUG_MODE) console.log('成功更新后端数据');
-
-                                    // 显示同步成功消息
-                                    self.showWalletMessage('数据已同步到后端', 3000);
-
-                                    // 如果是新的最高得分，显示祝贺消息
-                                    if (isNewLastScore) {
-                                        self.showWalletMessage('恭喜！新的最高得分: ' + currentGameScore);
-                                    }
-
-                                    // 更新游戏状态面板
-                                    if (typeof GameStatusPanel !== 'undefined') {
-                                        if (window.DEBUG_MODE) console.log('更新游戏状态面板');
-                                        GameStatusPanel.updatePanel();
-                                    }
-                                } else {
-                                    if (window.DEBUG_MODE) console.log('更新后端数据失败');
-
-                                    // 显示同步失败消息
-                                    self.showWalletMessage('数据同步失败，请刷新页面重试', 5000);
+                        // 生成游戏数据校验码
+                        return GameVerifier.generateVerificationCode(walletAddress, currentGameCoins)
+                            .then(verificationData => {
+                                if (!verificationData) {
+                                    console.error('生成校验码失败');
+                                    self.showWalletMessage('生成校验码失败，无法更新数据', 5000);
+                                    return false;
                                 }
+
+                                // 处理验证
+                                return processGameVerification(verificationData)
+                                    .then(result => {
+                                        if (result && result.success) {
+                                            if (window.DEBUG_MODE) console.log('成功验证游戏数据并更新金币');
+
+                                            // 显示同步成功消息
+                                            self.showWalletMessage('数据已验证并同步到后端', 3000);
+
+                                            // 如果是新的最高得分，显示祝贺消息
+                                            if (isNewLastScore) {
+                                                self.showWalletMessage('恭喜！新的最高得分: ' + currentGameScore);
+                                            }
+
+                                            // 更新游戏状态面板
+                                            if (typeof GameStatusPanel !== 'undefined') {
+                                                if (window.DEBUG_MODE) console.log('更新游戏状态面板');
+                                                GameStatusPanel.updatePanel();
+                                            }
+
+                                            // 验证游戏数据的接口已经更新了金币和相关数据，不需要再次更新用户数据
+                                            console.log('验证游戏数据成功，服务器已更新所有相关数据，无需额外更新');
+
+                                            // 直接返回成功结果
+                                            return true;
+                                        } else {
+                                            if (window.DEBUG_MODE) console.log('验证游戏数据失败:', result ? result.error : '未知错误');
+
+                                            // 显示验证失败消息
+                                            self.showWalletMessage('数据验证失败: ' + (result && result.error ? result.error : '未知错误'), 5000);
+                                            return false;
+                                        }
+                                    });
                             });
                     })
                     .catch(error => {
@@ -514,19 +683,52 @@ const WalletGameIntegration = {
                 try {
                     // 获取当前钱包地址
                     const walletAddress = WalletManager.getAccount();
+                    if (!walletAddress) {
+                        console.error('无法获取钱包地址，无法获取用户数据');
+                        return;
+                    }
                     console.log('当前钱包地址:', walletAddress);
+
+                    // 确保WalletProgress.useApi设置正确
+                    if (typeof WalletProgress !== 'undefined' && typeof WalletProgress.useApi !== 'undefined') {
+                        console.log('当前WalletProgress.useApi状态:', WalletProgress.useApi);
+
+                        // 如果API连接测试成功，确保useApi设置为true
+                        if (typeof window.ApiService !== 'undefined' && typeof ApiService.testConnection === 'function') {
+                            ApiService.testConnection().then(connected => {
+                                if (connected && !WalletProgress.useApi) {
+                                    console.log('API连接测试成功，设置WalletProgress.useApi = true');
+                                    WalletProgress.setUseApi(true);
+                                }
+                            }).catch(error => {
+                                console.error('API连接测试出错:', error);
+                            });
+                        }
+                    }
 
                     // 尝试从API获取当前用户数据
                     console.log('尝试从API获取当前用户数据...');
 
+                    // 添加更多调试信息
+                    console.log('从后端获取用户数据，钱包地址:', walletAddress);
+
+                    // 检查ApiService是否可用
+                    if (typeof window.ApiService === 'undefined') {
+                        console.error('ApiService对象未定义，请检查api-service.js是否正确加载');
+                        console.error('window对象上的所有属性:', Object.keys(window).join(', '));
+                    } else if (typeof window.ApiService.getUserData !== 'function') {
+                        console.error('ApiService.getUserData方法不可用，请检查api-service.js是否正确加载');
+                        console.error('ApiService对象上的所有方法:', Object.keys(window.ApiService).join(', '));
+                    }
+
                     // 确保ApiService正确初始化
                     if (window.ApiService && typeof window.ApiService.getUserData === 'function') {
-                        // 强制设置为9001端口
-                        // 不再需要在游戏结束时强制设置 baseUrl
-                        // if (window.ApiService.setBaseUrl) {
-                        //     // window.ApiService.setBaseUrl('http://localhost:9001'); // 移除强制设置
-                        //     // console.log('游戏结束时强制设置API端点为http://localhost:9001');
-                        // }
+                        // 检查ApiService.baseUrl
+                        console.log('当前ApiService.baseUrl:', ApiService.baseUrl);
+
+                        // 构建API URL并打印
+                        const apiUrl = ApiService.buildApiUrl(`/user/${walletAddress}`);
+                        console.log('获取用户数据URL:', apiUrl);
 
                         // 这里我们直接打印，不等待异步结果，因为onGameOver会处理实际的数据更新
                         ApiService.getUserData(walletAddress)
@@ -549,10 +751,48 @@ const WalletGameIntegration = {
                         })
                         .catch(error => {
                             console.error('获取用户数据时出错:', error);
+                            console.error('错误详情:', error.message);
+                            console.error('错误堆栈:', error.stack);
+
+                            // 尝试使用fetch API直接获取用户数据
+                            console.log('尝试使用fetch API直接获取用户数据...');
+                            fetch(`/api/user/${walletAddress}`)
+                            .then(response => {
+                                console.log('fetch响应状态:', response.status);
+                                if (response.ok) {
+                                    return response.json();
+                                } else {
+                                    throw new Error(`获取用户数据失败，状态码: ${response.status}`);
+                                }
+                            })
+                            .then(data => {
+                                console.log('使用fetch API获取的用户数据:', data);
+                            })
+                            .catch(fetchError => {
+                                console.error('使用fetch API获取用户数据时出错:', fetchError);
+                            });
                         });
                     } else {
                         console.error('ApiService不可用，无法获取用户数据');
                         console.error('请确保api-service.js已正确加载，并且后端服务器正在运行');
+
+                        // 尝试使用fetch API直接获取用户数据
+                        console.log('尝试使用fetch API直接获取用户数据...');
+                        fetch(`/api/user/${walletAddress}`)
+                        .then(response => {
+                            console.log('fetch响应状态:', response.status);
+                            if (response.ok) {
+                                return response.json();
+                            } else {
+                                throw new Error(`获取用户数据失败，状态码: ${response.status}`);
+                            }
+                        })
+                        .then(data => {
+                            console.log('使用fetch API获取的用户数据:', data);
+                        })
+                        .catch(fetchError => {
+                            console.error('使用fetch API获取用户数据时出错:', fetchError);
+                        });
                     }
                 } catch (e) {
                     console.error('尝试获取用户数据时出错:', e);
