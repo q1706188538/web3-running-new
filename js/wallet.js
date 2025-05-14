@@ -294,7 +294,7 @@ const WalletManager = {
 
         // 根据设备类型设置不同的提示文本
         if (isMobile && !isInMetaMaskBrowser) {
-            hint.innerHTML = '在移动设备上，您需要: <br>在dapp里可直接连接<br>1. 安装 <a href="https://metamask.io/download.html" target="_blank" style="color: #f5a623; text-decoration: none;">MetaMask应用</a><br>2. 在MetaMask应用内的浏览器中打开本游戏';
+            hint.innerHTML = '在移动设备上，您需要: <br>1. 在dapp里可直接连接<br>2. 安装 <a href="https://metamask.io/download.html" target="_blank" style="color: #f5a623; text-decoration: none;">MetaMask应用</a><br>3. 在MetaMask应用内的浏览器中打开本游戏';
         } else {
             hint.innerHTML = '没有MetaMask? <a href="https://metamask.io/download.html" target="_blank" style="color: #f5a623; text-decoration: none;">点击这里安装</a>';
         }
@@ -555,9 +555,9 @@ const WalletManager = {
                 return this.connectWithMetaMaskSDK();
             }
 
-            console.log('显示移动设备连接选项');
-            this.showMobileConnectGuide();
-            return;
+            // 直接尝试使用WalletConnect连接，不显示选项UI
+            console.log('移动设备上直接尝试使用WalletConnect连接');
+            return this.connectWithWalletConnect();
         }
 
         // 获取MetaMask提供商
