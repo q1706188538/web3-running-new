@@ -104,19 +104,27 @@ const WalletGameIntegration = {
             let currentGameCoins = 0;
 
             try {
-                // 尝试从GEMIOLI.Play.distanceText._cacheText获取本次游戏的分数
-                if (GEMIOLI.Play && GEMIOLI.Play.distanceText && GEMIOLI.Play.distanceText._cacheText) {
-                    // 从distanceText._cacheText获取分数，这是显示在界面上的实际距离值
-                    currentGameScore = parseInt(GEMIOLI.Play.distanceText._cacheText, 10);
-                    console.log('从GEMIOLI.Play.distanceText._cacheText获取分数:', currentGameScore);
+                // 从GEMIOLI.Play.coins获取本次游戏的分数和金币
+                if (GEMIOLI.Play && typeof GEMIOLI.Play.coins === 'number') {
+                    // 使用coins作为分数和金币
+                    currentGameScore = GEMIOLI.Play.coins;
+                    currentGameCoins = GEMIOLI.Play.coins;
+                    console.log('从GEMIOLI.Play.coins获取分数和金币:', currentGameScore);
                 } else {
-                    // 如果distanceText不可用，回退到使用distance
-                    currentGameScore = Math.floor(GEMIOLI.Play.distance);
-                    console.log('从GEMIOLI.Play.distance获取分数:', currentGameScore);
-                }
+                    // 回退方案1：尝试从distanceText._cacheText获取
+                    if (GEMIOLI.Play && GEMIOLI.Play.distanceText && GEMIOLI.Play.distanceText._cacheText) {
+                        currentGameScore = parseInt(GEMIOLI.Play.distanceText._cacheText, 10);
+                        console.log('回退方案1：从GEMIOLI.Play.distanceText._cacheText获取分数:', currentGameScore);
+                    } else {
+                        // 回退方案2：使用distance
+                        currentGameScore = Math.floor(GEMIOLI.Play.distance);
+                        console.log('回退方案2：从GEMIOLI.Play.distance获取分数:', currentGameScore);
+                    }
 
-                // 获取金币数量
-                currentGameCoins = GEMIOLI.Play.coins;
+                    // 尝试获取金币数量
+                    currentGameCoins = currentGameScore; // 如果无法获取coins，使用分数作为金币数量
+                    console.log('使用分数作为金币数量:', currentGameCoins);
+                }
 
                 if (window.DEBUG_MODE) {
                     console.log('本次游戏分数:', currentGameScore);
