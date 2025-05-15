@@ -1,10 +1,19 @@
 /**
  * Web3配置
- * 用于设置与区块链交互的各种参数
+ * 用于设置与区块链交互的各种参数以及游戏配置
  *
- * 当需要部署新的桥接合约时，只需更新此文件中的相关参数
+ * 当需要部署新的桥接合约或修改游戏配置时，只需更新此文件中的相关参数
  */
 const Web3Config = {
+    // 游戏基础配置
+    GAME: {
+        START_COST: 0,  // 游戏开始需要扣除的金币数量
+        RESTART_COST: 0,  // 再来一次需要扣除的金币数量
+        DEBUG_MODE: false,  // 是否启用调试模式
+        USE_API: true,  // 是否使用API
+        API_BASE_URL: '/api'  // API基础URL
+    },
+
     // 网络配置
     NETWORK: {
         ID: 97,  // BSC测试网
@@ -86,11 +95,27 @@ const Web3Config = {
     },
 
     /**
+     * 获取游戏基础配置
+     * @returns {Object} 游戏基础配置
+     */
+    getGame: function() {
+        return this.GAME;
+    },
+
+    /**
      * 初始化配置
      * 可以在这里添加从服务器获取配置的逻辑
      */
     init: function() {
         console.log('初始化Web3配置...');
+
+        // 设置全局调试模式
+        window.DEBUG_MODE = this.GAME.DEBUG_MODE;
+
+        // 如果存在WalletProgress，设置是否使用API
+        if (typeof WalletProgress !== 'undefined') {
+            WalletProgress.useApi = this.GAME.USE_API;
+        }
 
         // 这里可以添加从服务器获取最新配置的逻辑
         // 例如：
@@ -102,6 +127,7 @@ const Web3Config = {
         //         this.TOKEN = config.token;
         //         this.EXCHANGE = config.exchange;
         //         this.RECHARGE = config.recharge;
+        //         this.GAME = config.game;
         //         console.log('Web3配置已从服务器更新');
         //     })
         //     .catch(error => {
