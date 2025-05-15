@@ -24,7 +24,7 @@ const Web3Config = {
 
     // 桥接合约配置
     BRIDGE_CONTRACT: {
-        ADDRESS: "0x2244cb50Ce726ca34ae0FCD38f6ca99f2DA9f9A4",  // 桥接合约地址（新部署的合约地址）
+        ADDRESS: "0x4A9499e648D201BedaFFc9E481604E15D8447280",  // 桥接合约地址（新部署的合约地址）
         OWNER_ADDRESS: "0x744b9acff32f9184c6f6639e6536437e975a4444",  // 合约所有者地址
         GAME_SERVER_ADDRESS: "0xE628408B47918c17cf6B97dDfa2A27c9a1CF451d",  // 游戏服务器地址
         TAX_WALLET_ADDRESS: "0x828E565E19572aE99c2aE9fa2833E72FB16F8946"  // 税收钱包地址
@@ -35,12 +35,13 @@ const Web3Config = {
         NAME: "Running",  // 代币名称
         SYMBOL: "Running",  // 代币符号
         DECIMALS: 18,  // 代币小数位数
-        ADDRESS: "0x744b9acff32f9184c6f6639e6536437e975a4444"  // 新的代币合约地址
+        ADDRESS: "0xcf0d5de2ad5be4d1721fb77b99ac738d3f2a4444"  // 代币合约地址
     },
 
     // 兑换配置
     EXCHANGE: {
-        RATE: 1000,  // 兑换比例：1000个游戏金币 = 1个代币
+        RATE: 100,  // 兑换比例：100个代币 = 1个游戏金币
+        INVERSE_MODE: true,  // 使用反向兑换模式（代币兑换金币）
         MIN_AMOUNT: 1,  // 最小兑换金额（代币）
         MAX_AMOUNT: 1000,  // 最大兑换金额（代币）
         TAX_RATE: 1000  // 兑换税率（基点，1000 = 10%）
@@ -48,7 +49,8 @@ const Web3Config = {
 
     // 充值配置
     RECHARGE: {
-        RATE: 1000,  // 充值比例：1000个游戏金币 = 1个代币
+        RATE: 100,  // 充值比例：100个代币 = 1个游戏金币
+        INVERSE_MODE: true,  // 使用反向兑换模式（代币兑换金币）
         MIN_AMOUNT: 1,  // 最小充值金额（代币）
         MAX_AMOUNT: 1000,  // 最大充值金额（代币）
         TAX_RATE: 0  // 充值税率（基点，0 = 0%）
