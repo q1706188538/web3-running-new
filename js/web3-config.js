@@ -35,7 +35,7 @@ const Web3Config = {
         NAME: "DeSci",  // 代币名称
         SYMBOL: "DSCI",  // 代币符号
         DECIMALS: 18,  // 代币小数位数
-        ADDRESS: "0xcf0d5de2ad5be4d1721fb77b99ac738d3f2a4444"  // 代币合约地址
+        ADDRESS: "0x744b9acff32f9184c6f6639e6536437e975a4444"  // 新的代币合约地址
     },
 
     // 兑换配置
