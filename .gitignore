@@ -39,8 +39,16 @@ pids
 Thumbs.db
 
 # 用户数据文件
-server/data/*.json
+# server/data/*.json # Commented out as server/data/ below is more general
 data/
-server/data/
+# Ignore all contents of server/data, but not the directory itself
+server/data/*
+# Un-ignore the specific config file
+!server/data/web3-live-config.json
+# Ensure the server/data directory itself is not ignored if it was previously by a broader rule
+# (though server/data/* should handle this for files within, this makes it explicit for the dir if needed)
+# !server/data/
+# The above line is usually not needed if server/data/* is used and you have an un-ignored file inside.
+# We will rely on server/data/* and !server/data/web3-live-config.json
 # SpecStory explanation file
 .specstory/.what-is-this.md

@@ -37,8 +37,20 @@ const TokenRecharge = {
         if (typeof Web3Config !== 'undefined' && Web3Config.RECHARGE) {
             // 从Web3Config获取配置
             const rechargeConfig = Web3Config.getRecharge();
-            this.config.COINS_PER_TOKEN = rechargeConfig.RATE;
+            this.config.COINS_PER_TOKEN = rechargeConfig.RATE; // e.g., 100 (1代币=100金币)
             this.config.RECHARGE_FEE_PERCENT = rechargeConfig.TAX_RATE / 100; // 将基点转换为百分比
+
+            // 更新最小和最大充值金额（以金币为单位）
+            if (rechargeConfig.MIN_AMOUNT !== undefined) {
+                // Web3Config.RECHARGE.MIN_AMOUNT is in token units
+                this.config.MIN_RECHARGE_AMOUNT = rechargeConfig.MIN_AMOUNT * this.config.COINS_PER_TOKEN;
+                console.log(`TokenRecharge: MIN_RECHARGE_AMOUNT (coins) set from Web3Config: ${this.config.MIN_RECHARGE_AMOUNT}`);
+            }
+            if (rechargeConfig.MAX_AMOUNT !== undefined) {
+                // Web3Config.RECHARGE.MAX_AMOUNT is in token units
+                this.config.MAX_RECHARGE_AMOUNT = rechargeConfig.MAX_AMOUNT * this.config.COINS_PER_TOKEN;
+                console.log(`TokenRecharge: MAX_RECHARGE_AMOUNT (coins) set from Web3Config: ${this.config.MAX_RECHARGE_AMOUNT}`);
+            }
 
             // 获取代币信息
             const tokenConfig = Web3Config.getToken();
