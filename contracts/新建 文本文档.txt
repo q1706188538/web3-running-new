@@ -1,0 +1,26 @@
+@openzeppelin/=https://github.com/OpenZeppelin/openzeppelin-contracts/
+@openzeppelin/=https://github.com/OpenZeppelin/openzeppelin-contracts/
+
+
+初始参数包括：初始外部代币地址、游戏服务器地址、税收钱包地址、初始兑换比例、最小兑换金额和最大兑换金额
+
+setExchangeTokenTaxRate  设置金币充值代币的税率   contract.setExchangeTokenTaxRate(1000)  // 设置兑换税率为10%（1000基点）
+  
+setRechargeTokenTaxRate  设置代币充值金币的税率  await contract.setRechargeTokenTaxRate(0);  // 设置充值税率为0%（0基点）
+
+setTaxWallet  设置税收钱包地址
+
+setExternalToken  设置另外部代币地址 另一个代币作为流通代币  setExternalToken("0xYourNewTokenAddress")
+
+setExchangeRate  设置兑换比例  setExchangeRate(1000); 1000=1
+
+
+setInverseExchangeMode  设置兑换模式  true：(金币比代币值钱)代币兑换金币  false：(代币比金币值钱)金币兑换代币
+
+GameTokenBridgeUpgradeable.sol
+
+
+
+你给我的这个合约代码  不会影响我们现在网页上的兑换  充值功能吧还有资金池 奖励池    请检查下  
+
+
