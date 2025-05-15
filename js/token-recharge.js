@@ -798,18 +798,51 @@ const TokenRecharge = {
             return;
         }
 
-        // 获取用户想要充值的金币数量
-        const desiredCoins = amountInput.value === '' ? 0 : parseInt(amountInput.value);
+        // 获取用户输入的数量
+        const inputAmount = amountInput.value === '' ? 0 : parseInt(amountInput.value);
 
-        // 验证充值数量
-        if (amountInput.value === '' || desiredCoins < this.config.MIN_RECHARGE_AMOUNT) {
-            this.showResultMessage(`充值数量不能小于 ${this.config.MIN_RECHARGE_AMOUNT} 金币`, 'error');
-            return;
+        // 检查是否使用反向兑换模式
+        let inverseMode = false;
+        if (typeof Web3Config !== 'undefined' && Web3Config.RECHARGE && Web3Config.RECHARGE.INVERSE_MODE !== undefined) {
+            inverseMode = Web3Config.RECHARGE.INVERSE_MODE;
         }
 
-        if (desiredCoins > this.config.MAX_RECHARGE_AMOUNT) {
-            this.showResultMessage(`充值数量不能大于 ${this.config.MAX_RECHARGE_AMOUNT} 金币`, 'error');
-            return;
+        // 根据模式确定金币和代币数量
+        let desiredCoins = 0;
+        let tokenAmount = 0;
+
+        if (inverseMode) {
+            // 反向模式: 100代币=1金币
+            // 输入框是代币数量
+            tokenAmount = inputAmount;
+            desiredCoins = tokenAmount / this.config.COINS_PER_TOKEN;
+
+            // 验证充值数量
+            if (amountInput.value === '' || tokenAmount < this.config.MIN_RECHARGE_AMOUNT) {
+                this.showResultMessage(`充值数量不能小于 ${this.config.MIN_RECHARGE_AMOUNT} ${this.config.TOKEN_NAME}`, 'error');
+                return;
+            }
+
+            if (tokenAmount > this.config.MAX_RECHARGE_AMOUNT) {
+                this.showResultMessage(`充值数量不能大于 ${this.config.MAX_RECHARGE_AMOUNT} ${this.config.TOKEN_NAME}`, 'error');
+                return;
+            }
+        } else {
+            // 正常模式: 1000金币=1代币
+            // 输入框是金币数量
+            desiredCoins = inputAmount;
+            tokenAmount = desiredCoins / this.config.COINS_PER_TOKEN;
+
+            // 验证充值数量
+            if (amountInput.value === '' || desiredCoins < this.config.MIN_RECHARGE_AMOUNT) {
+                this.showResultMessage(`充值数量不能小于 ${this.config.MIN_RECHARGE_AMOUNT} 金币`, 'error');
+                return;
+            }
+
+            if (desiredCoins > this.config.MAX_RECHARGE_AMOUNT) {
+                this.showResultMessage(`充值数量不能大于 ${this.config.MAX_RECHARGE_AMOUNT} 金币`, 'error');
+                return;
+            }
         }
 
         // 计算金币税（直接使用百分比值）
@@ -820,9 +853,6 @@ const TokenRecharge = {
 
         const coinsFeeAmount = Math.floor(desiredCoins * effectiveFeePercentage);
         const actualCoinsAfterFee = desiredCoins - coinsFeeAmount;
-
-        // 计算需要的代币数量
-        const tokenAmount = desiredCoins / this.config.COINS_PER_TOKEN;
 
         // 计算代币税
         const tokenTaxPercentage = this.config.TOKEN_TAX_PERCENT / 100;
@@ -1063,13 +1093,28 @@ const TokenRecharge = {
     updateUnitLabels: function() {
         console.log('更新单位标签');
 
+        // 检查是否使用反向兑换模式
+        let inverseMode = false;
+        if (typeof Web3Config !== 'undefined' && Web3Config.RECHARGE && Web3Config.RECHARGE.INVERSE_MODE !== undefined) {
+            inverseMode = Web3Config.RECHARGE.INVERSE_MODE;
+        }
+
         // 查找所有单位标签
         const unitLabels = document.querySelectorAll('.token-unit-label');
         unitLabels.forEach(label => {
-            // 如果是充值页面的单位标签，设置为"金币"
+            // 如果是充值页面的单位标签
             if (label.closest('#token-recharge-container')) {
-                label.textContent = '金币';
-                console.log('充值页面单位标签已更新为"金币"');
+                if (inverseMode) {
+                    // 反向模式: 100代币=1金币
+                    // 输入框是代币数量
+                    label.textContent = this.config.TOKEN_NAME;
+                    console.log('充值页面单位标签已更新为代币名称:', this.config.TOKEN_NAME);
+                } else {
+                    // 正常模式: 1000金币=1代币
+                    // 输入框是金币数量
+                    label.textContent = '金币';
+                    console.log('充值页面单位标签已更新为"金币"');
+                }
             }
         });
     },
