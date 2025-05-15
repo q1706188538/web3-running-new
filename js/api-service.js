@@ -878,7 +878,7 @@ const ApiService = {
     },
 
     // 取消兑换，退还金币
-    cancelExchange: async function(playerAddress, tokenAmount, gameCoins, nonce) {
+    cancelExchange: async function(playerAddress, tokenAmount, gameCoins, nonce, inverseMode = false) {
         if (!playerAddress) {
             console.error('取消兑换失败: 玩家地址为空');
             return { success: false, error: '玩家地址为空' };
@@ -899,6 +899,8 @@ const ApiService = {
             return { success: false, error: 'nonce不能为空' };
         }
 
+        console.log('取消兑换，反向兑换模式:', inverseMode);
+
         try {
             const url = this.buildApiUrl(`/cancel-exchange`);
             console.log('API请求URL:', url);
@@ -908,7 +910,8 @@ const ApiService = {
                 tokenAmount,
                 gameCoins,
                 nonce,
-                reason: '用户取消交易'
+                reason: '用户取消交易',
+                inverseMode
             }, null, 2));
 
             const response = await fetch(url, {
@@ -921,7 +924,8 @@ const ApiService = {
                     tokenAmount,
                     gameCoins,
                     nonce,
-                    reason: '用户取消交易'
+                    reason: '用户取消交易',
+                    inverseMode
                 })
             });
 

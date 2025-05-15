@@ -1038,11 +1038,20 @@ const TokenExchange = {
                             console.log('- 代币数量:', tokenAmount);
                             console.log('- 游戏金币:', gameCoinsToUse);
 
+                            // 检查是否使用反向兑换模式
+                            let inverseMode = false;
+                            if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
+                                inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
+                            }
+
+                            console.log('- 反向兑换模式:', inverseMode);
+
                             // 从API获取签名
                             signatureData = await ApiService.getExchangeSignature(
                                 this.walletAddress,
                                 tokenAmount,
-                                gameCoinsToUse
+                                gameCoinsToUse,
+                                inverseMode  // 添加反向模式参数
                             );
 
                             if (!signatureData || !signatureData.success) {
@@ -1125,11 +1134,20 @@ const TokenExchange = {
                                 console.log('- 游戏金币:', gameCoinsToUse);
                                 console.log('- Nonce:', signatureData.nonce);
 
+                                // 检查是否使用反向兑换模式
+                                let inverseMode = false;
+                                if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
+                                    inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
+                                }
+
+                                console.log('- 反向兑换模式:', inverseMode);
+
                                 const cancelResult = await ApiService.cancelExchange(
                                     this.walletAddress,
                                     tokenAmount,
                                     gameCoinsToUse,
-                                    signatureData.nonce
+                                    signatureData.nonce,
+                                    inverseMode  // 添加反向模式参数
                                 );
 
                                 if (cancelResult.success) {
@@ -1161,11 +1179,20 @@ const TokenExchange = {
                             try {
                                 console.log('Gas费不足，尝试退还金币...');
 
+                                // 检查是否使用反向兑换模式
+                                let inverseMode = false;
+                                if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
+                                    inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
+                                }
+
+                                console.log('- 反向兑换模式:', inverseMode);
+
                                 const cancelResult = await ApiService.cancelExchange(
                                     this.walletAddress,
                                     tokenAmount,
                                     gameCoinsToUse,
-                                    signatureData.nonce
+                                    signatureData.nonce,
+                                    inverseMode  // 添加反向模式参数
                                 );
 
                                 if (cancelResult.success) {
@@ -1198,11 +1225,20 @@ const TokenExchange = {
                             try {
                                 console.log('合约执行失败，尝试退还金币...');
 
+                                // 检查是否使用反向兑换模式
+                                let inverseMode = false;
+                                if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
+                                    inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
+                                }
+
+                                console.log('- 反向兑换模式:', inverseMode);
+
                                 const cancelResult = await ApiService.cancelExchange(
                                     this.walletAddress,
                                     tokenAmount,
                                     gameCoinsToUse,
-                                    signatureData.nonce
+                                    signatureData.nonce,
+                                    inverseMode  // 添加反向模式参数
                                 );
 
                                 if (cancelResult.success) {
@@ -1233,11 +1269,20 @@ const TokenExchange = {
                             try {
                                 console.log('签名验证失败，尝试退还金币...');
 
+                                // 检查是否使用反向兑换模式
+                                let inverseMode = false;
+                                if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
+                                    inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
+                                }
+
+                                console.log('- 反向兑换模式:', inverseMode);
+
                                 const cancelResult = await ApiService.cancelExchange(
                                     this.walletAddress,
                                     tokenAmount,
                                     gameCoinsToUse,
-                                    signatureData.nonce
+                                    signatureData.nonce,
+                                    inverseMode  // 添加反向模式参数
                                 );
 
                                 if (cancelResult.success) {
@@ -1264,11 +1309,20 @@ const TokenExchange = {
                             try {
                                 console.log('交易失败，尝试退还金币...');
 
+                                // 检查是否使用反向兑换模式
+                                let inverseMode = false;
+                                if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
+                                    inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
+                                }
+
+                                console.log('- 反向兑换模式:', inverseMode);
+
                                 const cancelResult = await ApiService.cancelExchange(
                                     this.walletAddress,
                                     tokenAmount,
                                     gameCoinsToUse,
-                                    signatureData.nonce
+                                    signatureData.nonce,
+                                    inverseMode  // 添加反向模式参数
                                 );
 
                                 if (cancelResult.success) {
@@ -1320,11 +1374,20 @@ const TokenExchange = {
                         console.log('- 游戏金币:', gameCoinsToUse);
                         console.log('- Nonce:', signatureData.nonce);
 
+                        // 检查是否使用反向兑换模式
+                        let inverseMode = false;
+                        if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
+                            inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
+                        }
+
+                        console.log('- 反向兑换模式:', inverseMode);
+
                         const cancelResult = await ApiService.cancelExchange(
                             this.walletAddress,
                             tokenAmount,
                             gameCoinsToUse,
-                            signatureData.nonce
+                            signatureData.nonce,
+                            inverseMode  // 添加反向模式参数
                         );
 
                         if (cancelResult.success) {
