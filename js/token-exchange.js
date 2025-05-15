@@ -886,10 +886,10 @@ const TokenExchange = {
         if (inverseMode) {
             // 反向模式: 100代币=1金币
             calculationElement.innerHTML = `
-                <p>需要支付: <strong>${tokenAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
-                <p>应得金币: <strong>${requiredCoins.toLocaleString()}</strong> 金币</p>
+                <p>需要支付: <strong>${requiredCoins.toLocaleString()}</strong> 金币</p>
+                <p>应得代币: <strong>${tokenAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
                 <p>代币税: <strong>${tokenTaxAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME} (${this.config.TOKEN_TAX_PERCENT}%)</p>
-                <p>实际进入合约: <strong>${(tokenAmount - tokenTaxAmount).toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
+                <p>实际获得: <strong>${(tokenAmount - tokenTaxAmount).toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
                 <p>税收钱包获得: <strong>${tokenTaxAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
             `;
         } else {
@@ -906,13 +906,13 @@ const TokenExchange = {
         // 检查资源是否足够
         let isEnoughResources = false;
         if (inverseMode) {
-            // 反向模式: 检查代币是否足够
-            isEnoughResources = this.currentTokens >= tokenAmount;
+            // 反向模式: 检查金币是否足够
+            isEnoughResources = this.currentCoins >= requiredCoins;
 
-            // 如果代币不足，添加提示
+            // 如果金币不足，添加提示
             if (!isEnoughResources) {
                 calculationElement.innerHTML += `
-                    <p style="color: red; margin-top: 10px;">代币不足，还需要 ${(tokenAmount - this.currentTokens).toLocaleString()} ${this.config.TOKEN_NAME}</p>
+                    <p style="color: red; margin-top: 10px;">金币不足，还需要 ${(requiredCoins - this.currentCoins).toLocaleString()} 金币</p>
                 `;
             }
         } else {
