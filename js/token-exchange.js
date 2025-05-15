@@ -889,7 +889,7 @@ const TokenExchange = {
                 <p>需要支付: <strong>${tokenAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
                 <p>应得金币: <strong>${requiredCoins.toLocaleString()}</strong> 金币</p>
                 <p>代币税: <strong>${tokenTaxAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME} (${this.config.TOKEN_TAX_PERCENT}%)</p>
-                <p>实际支付: <strong>${(tokenAmount + tokenTaxAmount).toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
+                <p>实际进入合约: <strong>${(tokenAmount - tokenTaxAmount).toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
                 <p>税收钱包获得: <strong>${tokenTaxAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
             `;
         } else {
