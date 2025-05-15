@@ -656,12 +656,18 @@ const TokenRecharge = {
             return;
         }
 
-        // 获取用户想要充值的金币数量
-        let desiredCoins = 0;
+        // 检查是否使用反向兑换模式
+        let inverseMode = false;
+        if (typeof Web3Config !== 'undefined' && Web3Config.RECHARGE && Web3Config.RECHARGE.INVERSE_MODE !== undefined) {
+            inverseMode = Web3Config.RECHARGE.INVERSE_MODE;
+        }
+
+        // 获取用户输入的数量
+        let inputAmount = 0;
 
         // 如果输入框为空，使用0
         if (amountInput.value === '') {
-            desiredCoins = 0;
+            inputAmount = 0;
         } else {
             // 尝试解析为整数
             let value = 0;
@@ -681,7 +687,23 @@ const TokenRecharge = {
                 value = 0;
             }
 
-            desiredCoins = value;
+            inputAmount = value;
+        }
+
+        // 根据模式确定金币和代币数量
+        let desiredCoins = 0;
+        let tokenAmount = 0;
+
+        if (inverseMode) {
+            // 反向模式: 100代币=1金币
+            // 输入框是代币数量
+            tokenAmount = inputAmount;
+            desiredCoins = tokenAmount / this.config.COINS_PER_TOKEN;
+        } else {
+            // 正常模式: 1000金币=1代币
+            // 输入框是金币数量
+            desiredCoins = inputAmount;
+            tokenAmount = desiredCoins / this.config.COINS_PER_TOKEN;
         }
 
         // 使用解析后的值
@@ -701,24 +723,35 @@ const TokenRecharge = {
         const actualCoinsAfterFee = correctedCoins - coinsFeeAmount;
         console.log('扣除金币税后的金币数量:', actualCoinsAfterFee);
 
-        // 计算需要的代币数量
-        const tokenAmount = correctedCoins / this.config.COINS_PER_TOKEN;
-
         // 计算代币税
         const tokenTaxPercentage = this.config.TOKEN_TAX_PERCENT / 100;
         const tokenTaxAmount = tokenAmount * tokenTaxPercentage;
         const actualTokensToContract = tokenAmount - tokenTaxAmount;
 
         // 更新计算结果
-        calculationElement.innerHTML = `
-            <p>您将获得: <strong>${actualCoinsAfterFee.toLocaleString()}</strong> 金币</p>
-            <p>金币税: <strong>${coinsFeeAmount.toLocaleString()}</strong> 金币 (${this.config.RECHARGE_FEE_PERCENT}%)</p>
-            <p>需要支付: <strong>${tokenAmount.toFixed(4)}</strong> ${this.config.TOKEN_NAME}</p>
-            <p>代币税率: <strong>${tokenTaxPercentage*100}%</strong></p>
-            <p>代币分配:</p>
-            <p>- 进入合约: <strong>${actualTokensToContract.toFixed(4)}</strong> ${this.config.TOKEN_NAME} (${(100-tokenTaxPercentage*100)}%)</p>
-            <p>- 税收钱包获得: <strong>${tokenTaxAmount.toFixed(4)}</strong> ${this.config.TOKEN_NAME} (${tokenTaxPercentage*100}%)</p>
-        `;
+        if (inverseMode) {
+            // 反向模式: 100代币=1金币
+            calculationElement.innerHTML = `
+                <p>您将获得: <strong>${actualCoinsAfterFee.toLocaleString()}</strong> 金币</p>
+                <p>金币税: <strong>${coinsFeeAmount.toLocaleString()}</strong> 金币 (${this.config.RECHARGE_FEE_PERCENT}%)</p>
+                <p>需要支付: <strong>${tokenAmount.toFixed(4)}</strong> ${this.config.TOKEN_NAME}</p>
+                <p>代币税率: <strong>${tokenTaxPercentage*100}%</strong></p>
+                <p>代币分配:</p>
+                <p>- 进入合约: <strong>${actualTokensToContract.toFixed(4)}</strong> ${this.config.TOKEN_NAME} (${(100-tokenTaxPercentage*100)}%)</p>
+                <p>- 税收钱包获得: <strong>${tokenTaxAmount.toFixed(4)}</strong> ${this.config.TOKEN_NAME} (${tokenTaxPercentage*100}%)</p>
+            `;
+        } else {
+            // 正常模式: 1000金币=1代币
+            calculationElement.innerHTML = `
+                <p>您将获得: <strong>${actualCoinsAfterFee.toLocaleString()}</strong> 金币</p>
+                <p>金币税: <strong>${coinsFeeAmount.toLocaleString()}</strong> 金币 (${this.config.RECHARGE_FEE_PERCENT}%)</p>
+                <p>需要支付: <strong>${tokenAmount.toFixed(4)}</strong> ${this.config.TOKEN_NAME}</p>
+                <p>代币税率: <strong>${tokenTaxPercentage*100}%</strong></p>
+                <p>代币分配:</p>
+                <p>- 进入合约: <strong>${actualTokensToContract.toFixed(4)}</strong> ${this.config.TOKEN_NAME} (${(100-tokenTaxPercentage*100)}%)</p>
+                <p>- 税收钱包获得: <strong>${tokenTaxAmount.toFixed(4)}</strong> ${this.config.TOKEN_NAME} (${tokenTaxPercentage*100}%)</p>
+            `;
+        }
 
         // 检查代币是否足够
         const isEnoughTokens = this.currentTokens >= tokenAmount;
@@ -1048,8 +1081,20 @@ const TokenRecharge = {
         // 查找充值比例信息元素
         const rateInfo = document.getElementById('token-recharge-rate-info');
         if (rateInfo) {
-            rateInfo.innerHTML = `充值比例: <strong>1</strong> ${this.config.TOKEN_NAME} = <strong>${this.config.COINS_PER_TOKEN}</strong> 金币`;
-            console.log('充值比例UI已更新');
+            // 检查是否使用反向兑换模式
+            let inverseMode = false;
+            if (typeof Web3Config !== 'undefined' && Web3Config.RECHARGE && Web3Config.RECHARGE.INVERSE_MODE !== undefined) {
+                inverseMode = Web3Config.RECHARGE.INVERSE_MODE;
+            }
+
+            if (inverseMode) {
+                // 反向模式: 100代币=1金币
+                rateInfo.innerHTML = `充值比例: <strong>${this.config.COINS_PER_TOKEN}</strong> ${this.config.TOKEN_NAME} = <strong>1</strong> 金币`;
+            } else {
+                // 正常模式: 1000金币=1代币
+                rateInfo.innerHTML = `充值比例: <strong>1</strong> ${this.config.TOKEN_NAME} = <strong>${this.config.COINS_PER_TOKEN}</strong> 金币`;
+            }
+            console.log('充值比例UI已更新，反向模式:', inverseMode);
         } else {
             console.warn('找不到充值比例UI元素');
         }

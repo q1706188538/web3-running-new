@@ -856,9 +856,26 @@ const TokenExchange = {
             tokenAmount = value;
         }
 
-        // 计算需要的金币数量（不再有金币税）
-        const requiredCoins = tokenAmount * this.config.COINS_PER_TOKEN;
-        const totalCoinsNeeded = requiredCoins; // 不再有金币税
+        // 检查是否使用反向兑换模式
+        let inverseMode = false;
+        if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
+            inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
+        }
+
+        let requiredCoins = 0;
+        let totalCoinsNeeded = 0;
+
+        if (inverseMode) {
+            // 反向模式: 100代币=1金币
+            // 计算获得的金币数量
+            requiredCoins = tokenAmount / this.config.COINS_PER_TOKEN;
+            totalCoinsNeeded = 0; // 不需要支付金币
+        } else {
+            // 正常模式: 1000金币=1代币
+            // 计算需要的金币数量
+            requiredCoins = tokenAmount * this.config.COINS_PER_TOKEN;
+            totalCoinsNeeded = requiredCoins; // 不再有金币税
+        }
 
         // 计算代币税
         const tokenTaxPercentage = this.config.TOKEN_TAX_PERCENT / 100;
@@ -866,28 +883,54 @@ const TokenExchange = {
         const actualTokensReceived = tokenAmount - tokenTaxAmount;
 
         // 更新计算结果
-        calculationElement.innerHTML = `
-            <p>需要支付: <strong>${requiredCoins.toLocaleString()}</strong> 金币</p>
-            <p>应得代币: <strong>${tokenAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
-            <p>代币税: <strong>${tokenTaxAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME} (${this.config.TOKEN_TAX_PERCENT}%)</p>
-            <p>实际获得: <strong>${actualTokensReceived.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
-            <p>税收钱包获得: <strong>${tokenTaxAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
-        `;
-
-        // 检查金币是否足够
-        const isEnoughCoins = this.currentCoins >= totalCoinsNeeded;
-
-        // 更新兑换按钮状态
-        exchangeButton.disabled = !isEnoughCoins;
-        exchangeButton.style.opacity = isEnoughCoins ? '1' : '0.5';
-        exchangeButton.style.cursor = isEnoughCoins ? 'pointer' : 'not-allowed';
-
-        // 如果金币不足，添加提示
-        if (!isEnoughCoins) {
-            calculationElement.innerHTML += `
-                <p style="color: red; margin-top: 10px;">金币不足，还需要 ${(totalCoinsNeeded - this.currentCoins).toLocaleString()} 金币</p>
+        if (inverseMode) {
+            // 反向模式: 100代币=1金币
+            calculationElement.innerHTML = `
+                <p>需要支付: <strong>${tokenAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
+                <p>应得金币: <strong>${requiredCoins.toLocaleString()}</strong> 金币</p>
+                <p>代币税: <strong>${tokenTaxAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME} (${this.config.TOKEN_TAX_PERCENT}%)</p>
+                <p>实际支付: <strong>${(tokenAmount + tokenTaxAmount).toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
+                <p>税收钱包获得: <strong>${tokenTaxAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
+            `;
+        } else {
+            // 正常模式: 1000金币=1代币
+            calculationElement.innerHTML = `
+                <p>需要支付: <strong>${requiredCoins.toLocaleString()}</strong> 金币</p>
+                <p>应得代币: <strong>${tokenAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
+                <p>代币税: <strong>${tokenTaxAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME} (${this.config.TOKEN_TAX_PERCENT}%)</p>
+                <p>实际获得: <strong>${actualTokensReceived.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
+                <p>税收钱包获得: <strong>${tokenTaxAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
             `;
         }
+
+        // 检查资源是否足够
+        let isEnoughResources = false;
+        if (inverseMode) {
+            // 反向模式: 检查代币是否足够
+            isEnoughResources = this.currentTokens >= tokenAmount;
+
+            // 如果代币不足，添加提示
+            if (!isEnoughResources) {
+                calculationElement.innerHTML += `
+                    <p style="color: red; margin-top: 10px;">代币不足，还需要 ${(tokenAmount - this.currentTokens).toLocaleString()} ${this.config.TOKEN_NAME}</p>
+                `;
+            }
+        } else {
+            // 正常模式: 检查金币是否足够
+            isEnoughResources = this.currentCoins >= totalCoinsNeeded;
+
+            // 如果金币不足，添加提示
+            if (!isEnoughResources) {
+                calculationElement.innerHTML += `
+                    <p style="color: red; margin-top: 10px;">金币不足，还需要 ${(totalCoinsNeeded - this.currentCoins).toLocaleString()} 金币</p>
+                `;
+            }
+        }
+
+        // 更新兑换按钮状态
+        exchangeButton.disabled = !isEnoughResources;
+        exchangeButton.style.opacity = isEnoughResources ? '1' : '0.5';
+        exchangeButton.style.cursor = isEnoughResources ? 'pointer' : 'not-allowed';
     },
 
     // 执行兑换
@@ -1396,8 +1439,20 @@ const TokenExchange = {
         // 查找兑换比例信息元素
         const rateInfo = document.getElementById('token-exchange-rate-info');
         if (rateInfo) {
-            rateInfo.innerHTML = `兑换比例: <strong>${this.config.COINS_PER_TOKEN}</strong> 金币 = <strong>1</strong> ${this.config.TOKEN_NAME}`;
-            console.log('兑换比例UI已更新');
+            // 检查是否使用反向兑换模式
+            let inverseMode = false;
+            if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
+                inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
+            }
+
+            if (inverseMode) {
+                // 反向模式: 100代币=1金币
+                rateInfo.innerHTML = `兑换比例: <strong>${this.config.COINS_PER_TOKEN}</strong> ${this.config.TOKEN_NAME} = <strong>1</strong> 金币`;
+            } else {
+                // 正常模式: 1000金币=1代币
+                rateInfo.innerHTML = `兑换比例: <strong>${this.config.COINS_PER_TOKEN}</strong> 金币 = <strong>1</strong> ${this.config.TOKEN_NAME}`;
+            }
+            console.log('兑换比例UI已更新，反向模式:', inverseMode);
         } else {
             console.warn('找不到兑换比例UI元素');
         }
