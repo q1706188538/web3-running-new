@@ -1,0 +1,41 @@
+{
+  "GAME": {
+    "START_COST": 0,
+    "RESTART_COST": 0,
+    "DEBUG_MODE": false,
+    "USE_API": true,
+    "API_BASE_URL": "/api"
+  },
+  "NETWORK": {
+    "ID": 97,
+    "NAME": "Binance Smart Chain Testnet",
+    "RPC_URL": "https://data-seed-prebsc-1-s1.binance.org:8545/",
+    "EXPLORER_URL": "https://testnet.bscscan.com"
+  },
+  "BRIDGE_CONTRACT": {
+    "ADDRESS": "0xf54677367e6D3511DCa4C336EfE31eaDFc0cDc1b",
+    "OWNER_ADDRESS": "0x744b9acff32f9184c6f6639e6536437e975a4444",
+    "GAME_SERVER_ADDRESS": "0xadd34cadc4f69c65fb38c1ceecec707f05865163",
+    "TAX_WALLET_ADDRESS": "0xedea273fbfad20943aa75d3d77646b23a63707a9"
+  },
+  "TOKEN": {
+    "NAME": "Running",
+    "SYMBOL": "Running",
+    "DECIMALS": 18,
+    "ADDRESS": "0x744b9acff32f9184c6f6639e6536437e975a4444"
+  },
+  "EXCHANGE": {
+    "RATE": 100,
+    "INVERSE_MODE": true,
+    "MIN_AMOUNT": 100,
+    "MAX_AMOUNT": 1000000,
+    "TAX_RATE": 1000
+  },
+  "RECHARGE": {
+    "RATE": 100,
+    "INVERSE_MODE": true,
+    "MIN_AMOUNT": 100,
+    "MAX_AMOUNT": 100000000,
+    "TAX_RATE": 0
+  }
+}
