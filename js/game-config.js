@@ -59,7 +59,7 @@ const GameConfig = {
         TOKEN_NAME: "DeSci",
 
         // 充值比例：1个代币可以充值多少游戏金币
-        COINS_PER_TOKEN: 100,
+        COINS_PER_TOKEN: 1000, // 更新为1000，与web3-config.js中的设置一致
 
         // 最小充值数量（代币）
         MIN_RECHARGE_AMOUNT: 1,
@@ -68,10 +68,10 @@ const GameConfig = {
         MAX_RECHARGE_AMOUNT: 1000,
 
         // 充值手续费（直接百分比）
-        RECHARGE_FEE_PERCENT: 2, // 2%，设置充值金币税率为2%
+        RECHARGE_FEE_PERCENT: 0, // 更新为0%，与web3-config.js中的设置一致
 
         // 代币合约地址（与兑换使用相同合约）
-        CONTRACT_ADDRESS: "0x9c3748543cB4AE1951dd61485C417e12696Ca408",
+        CONTRACT_ADDRESS: "0x2244cb50Ce726ca34ae0FCD38f6ca99f2DA9f9A4", // 更新为新合约地址
 
         // 游戏服务器合约地址（用于验证签名）
         GAME_SERVER_ADDRESS: "0xE628408B47918c17cf6B97dDfa2A27c9a1CF451d", // 与服务器端使用的地址一致

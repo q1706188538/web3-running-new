@@ -17,12 +17,12 @@ const TokenRecharge = {
 
     // 充值配置
     config: {
-        TOKEN_NAME: "TWB",
-        COINS_PER_TOKEN: 100, // 每个代币可以充值的金币数量，与兑换时相同
+        TOKEN_NAME: "DeSci",
+        COINS_PER_TOKEN: 1000, // 每个代币可以充值的金币数量，与web3-config.js中的设置一致
         MIN_RECHARGE_AMOUNT: 100, // 最小充值金币数量
         MAX_RECHARGE_AMOUNT: 10000, // 最大充值金币数量
-        RECHARGE_FEE_PERCENT: 2, // 充值金币税率，2%（直接百分比）
-        TOKEN_TAX_PERCENT: 1 // 代币税率，1%
+        RECHARGE_FEE_PERCENT: 0, // 充值金币税率，0%（直接百分比）
+        TOKEN_TAX_PERCENT: 0 // 代币税率，0%
     },
 
     // 初始化
@@ -33,8 +33,23 @@ const TokenRecharge = {
 
         console.log('初始化代币充值模块...');
 
-        // 从GameConfig获取配置
-        if (typeof GameConfig !== 'undefined' && GameConfig.TOKEN_RECHARGE) {
+        // 从Web3Config获取配置（优先）
+        if (typeof Web3Config !== 'undefined' && Web3Config.RECHARGE) {
+            // 从Web3Config获取配置
+            const rechargeConfig = Web3Config.getRecharge();
+            this.config.COINS_PER_TOKEN = rechargeConfig.RATE;
+            this.config.RECHARGE_FEE_PERCENT = rechargeConfig.TAX_RATE / 100; // 将基点转换为百分比
+
+            // 获取代币信息
+            const tokenConfig = Web3Config.getToken();
+            if (tokenConfig) {
+                this.config.TOKEN_NAME = tokenConfig.SYMBOL;
+            }
+
+            console.log('从Web3Config加载代币充值配置:', this.config);
+        }
+        // 如果Web3Config不存在，则从GameConfig获取配置
+        else if (typeof GameConfig !== 'undefined' && GameConfig.TOKEN_RECHARGE) {
             this.config = GameConfig.TOKEN_RECHARGE;
             console.log('从GameConfig加载代币充值配置:', this.config);
         }
@@ -503,6 +518,22 @@ const TokenRecharge = {
 
         // 更新余额信息
         await this.updateBalances();
+
+        // 从Web3Config重新获取最新配置
+        if (typeof Web3Config !== 'undefined') {
+            // 从Web3Config获取配置
+            const rechargeConfig = Web3Config.getRecharge();
+            this.config.COINS_PER_TOKEN = rechargeConfig.RATE;
+            this.config.RECHARGE_FEE_PERCENT = rechargeConfig.TAX_RATE / 100; // 将基点转换为百分比
+
+            // 获取代币信息
+            const tokenConfig = Web3Config.getToken();
+            if (tokenConfig) {
+                this.config.TOKEN_NAME = tokenConfig.SYMBOL;
+            }
+
+            console.log('从Web3Config更新代币充值配置:', this.config);
+        }
 
         // 检查localStorage中是否有测试页面保存的值
         const testValue = localStorage.getItem('inputTestValue');
