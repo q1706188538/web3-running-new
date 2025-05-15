@@ -1090,8 +1090,27 @@ const TokenExchange = {
                     console.log('- Nonce:', signatureData.nonce);
                     console.log('- 签名长度:', signatureData.signature.length);
 
+                    // 检查是否使用反向兑换模式
+                    let inverseMode = false;
+                    if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
+                        inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
+                    }
+
+                    // 在反向兑换模式下，需要调整代币数量
+                    // 因为合约期望的是wei单位，但前端显示的是代币单位
+                    // 在反向模式下，我们需要将代币数量转换为正确的wei单位
+                    let adjustedTokenAmount = tokenAmount;
+                    if (inverseMode) {
+                        // 根据合约中的计算逻辑调整代币数量
+                        // 合约中的计算: expectedTokenAmount = gameCoins * exchangeRate * (10**decimals) / 1e18
+                        // 我们需要确保传入的tokenAmount与此计算结果匹配
+                        const exchangeRate = this.config.COINS_PER_TOKEN;
+                        adjustedTokenAmount = gameCoinsToUse * exchangeRate;
+                        console.log('反向兑换模式 - 调整后的代币数量:', adjustedTokenAmount);
+                    }
+
                     const exchangeResult = await Web3TokenContract.exchangeCoinsForTokensWithSignature(
-                        tokenAmount,
+                        adjustedTokenAmount,
                         gameCoinsToUse,
                         signatureData.nonce,
                         signatureData.signature

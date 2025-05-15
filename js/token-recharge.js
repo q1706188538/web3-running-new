@@ -937,9 +937,27 @@ const TokenRecharge = {
                         throw new Error('ApiService不可用，无法获取交易签名');
                     }
 
+                    // 检查是否使用反向兑换模式
+                    let inverseMode = false;
+                    if (typeof Web3Config !== 'undefined' && Web3Config.RECHARGE && Web3Config.RECHARGE.INVERSE_MODE !== undefined) {
+                        inverseMode = Web3Config.RECHARGE.INVERSE_MODE;
+                    }
+
+                    // 在反向兑换模式下，需要调整代币数量
+                    // 因为合约期望的是wei单位，但前端显示的是代币单位
+                    let adjustedTokenAmount = tokenAmountToUse;
+                    if (inverseMode) {
+                        // 根据合约中的计算逻辑调整代币数量
+                        // 合约中的计算: expectedGameCoins = tokenAmount * 1e18 / exchangeRate / (10**decimals)
+                        // 我们需要确保传入的tokenAmount与此计算结果匹配
+                        const exchangeRate = this.config.COINS_PER_TOKEN;
+                        // 不需要调整，因为充值时用户直接输入代币数量，而不是金币数量
+                        console.log('反向兑换模式 - 使用原始代币数量:', adjustedTokenAmount);
+                    }
+
                     // 调用Web3TokenContract的rechargeTokensForCoins方法
                     const rechargeResult = await Web3TokenContract.rechargeTokensForCoinsWithSignature(
-                        tokenAmountToUse,
+                        adjustedTokenAmount,
                         gameCoinsToGain,
                         signatureData.nonce,
                         signatureData.signature
