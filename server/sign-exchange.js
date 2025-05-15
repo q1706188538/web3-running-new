@@ -3,15 +3,43 @@
  * 用于生成代币兑换签名
  */
 const ethers = require('ethers');
+const fs = require('fs');
+const path = require('path');
 
-// 游戏服务器私钥
-const GAME_SERVER_PRIVATE_KEY = '0x394ca9cc8a37707635a86f5dbedf7f26d508104bd4f1317733f9d5533c92318b';
+const CONFIG_FILE_PATH = path.join(__dirname, 'data', 'web3-live-config.json');
+const DEFAULT_GAME_SERVER_PRIVATE_KEY = '0x394ca9cc8a37707635a86f5dbedf7f26d508104bd4f1317733f9d5533c92318b'; // Fallback
 
-// 游戏服务器地址（从私钥派生）
-const gameServerWallet = new ethers.Wallet(GAME_SERVER_PRIVATE_KEY);
-const GAME_SERVER_ADDRESS = gameServerWallet.address;
+// 函数：获取游戏服务器凭证（私钥和地址）
+function getGameServerCredentials() {
+    let privateKey = DEFAULT_GAME_SERVER_PRIVATE_KEY;
+    let address = new ethers.Wallet(privateKey).address; // Address from default key
 
-console.log('游戏服务器地址:', GAME_SERVER_ADDRESS);
+    try {
+        if (fs.existsSync(CONFIG_FILE_PATH)) {
+            const rawConfig = fs.readFileSync(CONFIG_FILE_PATH, 'utf8');
+            const liveConfig = JSON.parse(rawConfig);
+            if (liveConfig && liveConfig.GAME_SERVER_PRIVATE_KEY && ethers.utils.isHexString(liveConfig.GAME_SERVER_PRIVATE_KEY, 32)) {
+                privateKey = liveConfig.GAME_SERVER_PRIVATE_KEY;
+                address = new ethers.Wallet(privateKey).address; // Address from live config key
+                console.log('sign-exchange: Loaded GAME_SERVER_PRIVATE_KEY from web3-live-config.json');
+            } else {
+                console.log('sign-exchange: GAME_SERVER_PRIVATE_KEY not found or invalid in web3-live-config.json, using default.');
+            }
+        } else {
+            console.log(`sign-exchange: ${CONFIG_FILE_PATH} not found, using default private key.`);
+        }
+    } catch (error) {
+        console.error('sign-exchange: Error loading or parsing web3-live-config.json, using default private key:', error);
+    }
+    
+    // console.log('sign-exchange: Using Game Server Address:', address); // Log address each time it's derived
+    return { privateKey, address };
+}
+
+// 初始打印一次（可能使用默认值）
+const initialCredentials = getGameServerCredentials();
+console.log('sign-exchange: Initial Game Server Address (may use default):', initialCredentials.address);
+
 
 // 生成随机nonce
 function generateRandomNonce() {
@@ -34,6 +62,13 @@ function toEthSignedMessageHash(hash) {
 
 // 生成兑换签名 - 与合约完全匹配版
 async function generateExchangeSignature(playerAddress, tokenAmount, gameCoins, contractAddress) {
+    const { privateKey: currentGameServerPrivateKey, address: currentGameServerAddress } = getGameServerCredentials();
+    if (!currentGameServerPrivateKey || !currentGameServerAddress) {
+        console.error('sign-exchange: Critical error - could not determine game server credentials.');
+        return { success: false, error: 'Server configuration error for signing credentials.' };
+    }
+    // console.log(`sign-exchange: Using dynamic address for exchange sig: ${currentGameServerAddress}`);
+
     try {
         // 生成随机nonce
         const nonce = generateRandomNonce();
@@ -157,7 +192,7 @@ async function generateExchangeSignature(playerAddress, tokenAmount, gameCoins, 
         console.log('以太坊签名消息哈希:', ethSignedMessageHash);
 
         // 3. 使用私钥直接签名ethSignedMessageHash
-        const wallet = new ethers.Wallet(GAME_SERVER_PRIVATE_KEY);
+        const wallet = new ethers.Wallet(currentGameServerPrivateKey);
 
         // 签名时不要使用signMessage（它会再次添加前缀），而是使用signDigest直接签名
         // 注意：signDigest不是异步函数，不需要await
@@ -170,10 +205,10 @@ async function generateExchangeSignature(playerAddress, tokenAmount, gameCoins, 
         // 验证签名是否正确
         const recoveredAddress = ethers.utils.recoverAddress(ethSignedMessageHash, signatureString);
         console.log('恢复的签名者地址:', recoveredAddress);
-        console.log('游戏服务器地址:', GAME_SERVER_ADDRESS);
+        console.log('当前游戏服务器地址:', currentGameServerAddress);
 
-        if (recoveredAddress.toLowerCase() !== GAME_SERVER_ADDRESS.toLowerCase()) {
-            throw new Error('签名验证失败，恢复的地址与游戏服务器地址不匹配');
+        if (recoveredAddress.toLowerCase() !== currentGameServerAddress.toLowerCase()) {
+            throw new Error('签名验证失败，恢复的地址与当前游戏服务器地址不匹配');
         }
 
         // 在服务器端验证签名是否能被合约接受
@@ -191,7 +226,7 @@ async function generateExchangeSignature(playerAddress, tokenAmount, gameCoins, 
             success: true,
             signature: signatureString,
             nonce: nonce,
-            signer: GAME_SERVER_ADDRESS
+            signer: currentGameServerAddress
         };
     } catch (error) {
         console.error('生成签名出错:', error);
@@ -204,6 +239,13 @@ async function generateExchangeSignature(playerAddress, tokenAmount, gameCoins, 
 
 // 生成充值签名 - 与合约完全匹配版
 async function generateRechargeSignature(playerAddress, tokenAmount, gameCoins, contractAddress) {
+    const { privateKey: currentGameServerPrivateKey, address: currentGameServerAddress } = getGameServerCredentials();
+    if (!currentGameServerPrivateKey || !currentGameServerAddress) {
+        console.error('sign-exchange: Critical error - could not determine game server credentials for recharge.');
+        return { success: false, error: 'Server configuration error for signing credentials.' };
+    }
+    // console.log(`sign-exchange: Using dynamic address for recharge sig: ${currentGameServerAddress}`);
+
     try {
         // 生成随机nonce
         const nonce = generateRandomNonce();
@@ -256,7 +298,7 @@ async function generateRechargeSignature(playerAddress, tokenAmount, gameCoins, 
         console.log('以太坊签名消息哈希:', ethSignedMessageHash);
 
         // 使用私钥直接签名ethSignedMessageHash
-        const wallet = new ethers.Wallet(GAME_SERVER_PRIVATE_KEY);
+        const wallet = new ethers.Wallet(currentGameServerPrivateKey);
 
         // 签名时不要使用signMessage（它会再次添加前缀），而是使用signDigest直接签名
         // 注意：signDigest不是异步函数，不需要await
@@ -269,17 +311,17 @@ async function generateRechargeSignature(playerAddress, tokenAmount, gameCoins, 
         // 验证签名是否正确
         const recoveredAddress = ethers.utils.recoverAddress(ethSignedMessageHash, signatureString);
         console.log('恢复的签名者地址:', recoveredAddress);
-        console.log('游戏服务器地址:', GAME_SERVER_ADDRESS);
+        console.log('当前游戏服务器地址:', currentGameServerAddress);
 
-        if (recoveredAddress.toLowerCase() !== GAME_SERVER_ADDRESS.toLowerCase()) {
-            throw new Error('签名验证失败，恢复的地址与游戏服务器地址不匹配');
+        if (recoveredAddress.toLowerCase() !== currentGameServerAddress.toLowerCase()) {
+            throw new Error('签名验证失败，恢复的地址与当前游戏服务器地址不匹配');
         }
 
         return {
             success: true,
             signature: signatureString,
             nonce: nonce,
-            signer: GAME_SERVER_ADDRESS
+            signer: currentGameServerAddress
         };
     } catch (error) {
         console.error('生成充值签名出错:', error);
@@ -292,6 +334,12 @@ async function generateRechargeSignature(playerAddress, tokenAmount, gameCoins, 
 
 // 验证签名 - 修复版
 async function verifySignature(playerAddress, tokenAmount, gameCoins, nonce, contractAddress, signature) {
+    const { address: currentGameServerAddress } = getGameServerCredentials(); // Only need address for verification
+    if (!currentGameServerAddress) {
+        console.error('sign-exchange: Critical error - could not determine game server address for verification.');
+        return { success: false, error: 'Server configuration error for signing credentials.', isValid: false };
+    }
+
     try {
         console.log('验证签名...');
         console.log('玩家地址:', playerAddress);
@@ -319,10 +367,10 @@ async function verifySignature(playerAddress, tokenAmount, gameCoins, nonce, con
         const recoveredAddress = ethers.utils.recoverAddress(ethSignedMessageHash, signature);
 
         console.log('恢复的签名者地址:', recoveredAddress);
-        console.log('游戏服务器地址:', GAME_SERVER_ADDRESS);
+        console.log('当前游戏服务器地址:', currentGameServerAddress);
 
         // 验证签名者是否为游戏服务器
-        const isValid = recoveredAddress.toLowerCase() === GAME_SERVER_ADDRESS.toLowerCase();
+        const isValid = recoveredAddress.toLowerCase() === currentGameServerAddress.toLowerCase();
 
         return {
             success: isValid,
@@ -343,6 +391,7 @@ async function verifySignature(playerAddress, tokenAmount, gameCoins, nonce, con
 module.exports = {
     generateExchangeSignature,
     generateRechargeSignature,
-    verifySignature,
-    GAME_SERVER_ADDRESS
+    verifySignature
+    // GAME_SERVER_ADDRESS is no longer static, so not exporting it directly.
+    // If needed externally, a function to get the current address could be exposed.
 };

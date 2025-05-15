@@ -34,8 +34,9 @@
   "RECHARGE": {
     "RATE": 100,
     "INVERSE_MODE": true,
-    "MIN_AMOUNT": 100,
+    "MIN_AMOUNT": 1,
     "MAX_AMOUNT": 100000000,
     "TAX_RATE": 0
-  }
+  },
+  "GAME_SERVER_PRIVATE_KEY": "0x394ca9cc8a37707635a86f5dbedf7f26d508104bd4f1317733f9d5533c92318b"
 }

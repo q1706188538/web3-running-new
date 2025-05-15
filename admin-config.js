@@ -46,6 +46,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             }
         }
+        // Populate GAME_SERVER_PRIVATE_KEY (top-level)
+        const pkElementPopulate = form.elements['gameServerPrivateKey']; // Use ID here for querying
+        if (pkElementPopulate) {
+            if (config.GAME_SERVER_PRIVATE_KEY !== undefined) {
+                pkElementPopulate.value = config.GAME_SERVER_PRIVATE_KEY;
+                // console.log('Populated GAME_SERVER_PRIVATE_KEY');
+                // Security Note: For production, avoid displaying the full key.
+            } else {
+                pkElementPopulate.value = ''; // Clear if not present in config
+            }
+        } else {
+            console.warn('Element not found for gameServerPrivateKey during populate');
+        }
     }
 
     // Function to collect data from form
@@ -60,18 +73,29 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (element.type === 'checkbox') {
                         formData[sectionKey][key] = element.checked;
                     } else if (element.type === 'number') {
-                        // Convert to number, but allow empty strings for optional fields
-                        const value = parseFloat(element.value);
-                        formData[sectionKey][key] = isNaN(value) && element.value.trim() === '' ? null : (isNaN(value) ? element.value : value) ;
-                         if (formData[sectionKey][key] === null && element.value.trim() !== '') { // if it was not a number but not empty, keep as string
-                            formData[sectionKey][key] = element.value;
+                        const valueStr = element.value.trim();
+                        if (valueStr === '') {
+                            formData[sectionKey][key] = null; // Or undefined, depending on how backend handles it
+                        } else {
+                            const valueNum = parseFloat(valueStr);
+                            formData[sectionKey][key] = isNaN(valueNum) ? valueStr : valueNum;
                         }
-                    }
-                    else {
+                    } else {
                         formData[sectionKey][key] = element.value;
                     }
                 }
             });
+        }
+
+        // Collect GAME_SERVER_PRIVATE_KEY (top-level)
+        const pkElementCollect = form.elements['gameServerPrivateKey']; // Use ID here for querying
+        if (pkElementCollect) {
+            // Include the private key value, even if it's an empty string.
+            // The server-side logic in sign-exchange.js will use the default if this is empty or invalid.
+            formData.GAME_SERVER_PRIVATE_KEY = pkElementCollect.value;
+            // console.log('Collected GAME_SERVER_PRIVATE_KEY:', formData.GAME_SERVER_PRIVATE_KEY);
+        } else {
+            console.warn('Element not found for gameServerPrivateKey during collect');
         }
         return formData;
     }

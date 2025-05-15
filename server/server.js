@@ -894,7 +894,7 @@ app.post('/api/sign-exchange', async (req, res) => {
             success: true,
             signature: result.signature,
             nonce: result.nonce,
-            signer: GAME_SERVER_ADDRESS,
+            signer: result.signer, // 使用从generateExchangeSignature返回的动态signer地址
             coinsDeducted: gameCoins,
             coinsRemaining: userData.coins,
             message: '签名生成成功，金币已扣除'
@@ -998,7 +998,7 @@ app.post('/api/sign-recharge', async (req, res) => {
             success: true,
             signature: result.signature,
             nonce: result.nonce,
-            signer: GAME_SERVER_ADDRESS,
+            signer: result.signer, // 使用从generateRechargeSignature返回的动态signer地址
             gameCoinsToGain: gameCoins,
             message: '充值签名生成成功'
         });
