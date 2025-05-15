@@ -32,8 +32,8 @@ const Web3Config = {
 
     // 代币配置
     TOKEN: {
-        NAME: "Running",  // 代币名称
-        SYMBOL: "Running",  // 代币符号
+        NAME: "DeSci",  // 代币名称
+        SYMBOL: "DeSci",  // 代币符号
         DECIMALS: 18,  // 代币小数位数
         ADDRESS: "0xcf0d5de2ad5be4d1721fb77b99ac738d3f2a4444"  // 代币合约地址
     },
@@ -42,8 +42,8 @@ const Web3Config = {
     EXCHANGE: {
         RATE: 100,  // 兑换比例：100个代币 = 1个游戏金币
         INVERSE_MODE: true,  // 使用反向兑换模式（代币兑换金币）
-        MIN_AMOUNT: 1,  // 最小兑换金额（代币）
-        MAX_AMOUNT: 1000,  // 最大兑换金额（代币）
+        MIN_AMOUNT: 100,  // 最小兑换金额（代币）
+        MAX_AMOUNT: 1000000,  // 最大兑换金额（代币）
         TAX_RATE: 1000  // 兑换税率（基点，1000 = 10%）
     },
 
@@ -51,8 +51,8 @@ const Web3Config = {
     RECHARGE: {
         RATE: 100,  // 充值比例：100个代币 = 1个游戏金币
         INVERSE_MODE: true,  // 使用反向兑换模式（代币兑换金币）
-        MIN_AMOUNT: 1,  // 最小充值金额（代币）
-        MAX_AMOUNT: 1000,  // 最大充值金额（代币）
+        MIN_AMOUNT: 100,  // 最小充值金额（代币）
+        MAX_AMOUNT: 100000000,  // 最大充值金额（代币）
         TAX_RATE: 0  // 充值税率（基点，0 = 0%）
     },
 

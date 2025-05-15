@@ -133,12 +133,23 @@ async function generateExchangeSignature(playerAddress, tokenAmount, gameCoins, 
         console.log('- contractAddress:', ethers.utils.hexlify(ethers.utils.arrayify(contractAddressLower)));
 
         // 确保所有参数都是正确的格式
+        const gameCoinsBigNum = ethers.BigNumber.from(gameCoinsNumber); // 将 gameCoins 也转为 BigNumber
+        console.log('BigNumber gameCoins:', gameCoinsBigNum.toString()); // 调试日志
+
         const messageHash = ethers.utils.keccak256(
             ethers.utils.solidityPack(
                 ['address', 'uint256', 'uint256', 'bytes32', 'address'],
-                [playerAddressLower, gameCoinsNumber, tokenAmountInWei, nonceFormatted, contractAddressLower]
+                [playerAddressLower, gameCoinsBigNum, tokenAmountInWei, nonceFormatted, contractAddressLower]
             )
         );
+
+        console.log('--- Parameters for solidityPack ---');
+        console.log('playerAddressLower:', playerAddressLower, '(type:', typeof playerAddressLower, ')');
+        console.log('gameCoinsBigNum:', gameCoinsBigNum.toString(), '(type: BigNumber)');
+        console.log('tokenAmountInWei:', tokenAmountInWei.toString(), '(type: BigNumber)');
+        console.log('nonceFormatted:', nonceFormatted, '(type:', typeof nonceFormatted, ')');
+        console.log('contractAddressLower:', contractAddressLower, '(type:', typeof contractAddressLower, ')');
+        console.log('--- End Parameters for solidityPack ---');
         console.log('消息哈希:', messageHash);
 
         // 2. 添加以太坊签名前缀 - 与合约的toEthSignedMessageHash等效

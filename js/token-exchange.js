@@ -109,20 +109,30 @@ const TokenExchange = {
 
                     // 获取代币税率
                     try {
-                        const taxRates = await Web3TokenContract.getTokenTaxRates();
-                        if (taxRates) {
-                            console.log('获取到代币税率:', taxRates);
+                        // 检查是否已经从Web3Config加载了税率
+                        let taxRateFromConfig = false;
+                        if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.TAX_RATE !== undefined) {
+                            taxRateFromConfig = true;
+                            console.log('已从Web3Config加载税率:', Web3Config.EXCHANGE.TAX_RATE / 100, '%');
+                        }
 
-                            // 更新兑换代币税率
-                            if (taxRates.exchangeTokenTaxRate !== undefined) {
-                                this.config.TOKEN_TAX_PERCENT = taxRates.exchangeTokenTaxRate / 100;
-                                console.log('更新兑换代币税率为:', this.config.TOKEN_TAX_PERCENT, '%');
+                        // 如果没有从Web3Config加载税率，才从合约获取
+                        if (!taxRateFromConfig) {
+                            const taxRates = await Web3TokenContract.getTokenTaxRates();
+                            if (taxRates) {
+                                console.log('获取到代币税率:', taxRates);
 
-                                // 更新UI中的代币税率
-                                // 在初始化时，UI可能还没有创建，所以我们需要在show方法中更新
-                                this.updateTaxRateUI();
+                                // 更新兑换代币税率
+                                if (taxRates.exchangeTokenTaxRate !== undefined) {
+                                    this.config.TOKEN_TAX_PERCENT = taxRates.exchangeTokenTaxRate / 100;
+                                    console.log('更新兑换代币税率为:', this.config.TOKEN_TAX_PERCENT, '%');
+                                }
                             }
                         }
+
+                        // 更新UI中的代币税率
+                        // 在初始化时，UI可能还没有创建，所以我们需要在show方法中更新
+                        this.updateTaxRateUI();
                     } catch (taxError) {
                         console.warn('获取代币税率失败:', taxError);
                     }
@@ -729,6 +739,12 @@ const TokenExchange = {
         // 更新计算结果
         this.updateCalculation();
 
+        // 确保使用Web3Config中的税率
+        if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.TAX_RATE !== undefined) {
+            this.config.TOKEN_TAX_PERCENT = Web3Config.EXCHANGE.TAX_RATE / 100; // 基点转换为百分比
+            console.log('从Web3Config更新代币税率:', this.config.TOKEN_TAX_PERCENT, '%');
+        }
+
         // 更新代币税率UI
         this.updateTaxRateUI();
 
@@ -875,6 +891,11 @@ const TokenExchange = {
             // 计算需要的金币数量
             requiredCoins = tokenAmount * this.config.COINS_PER_TOKEN;
             totalCoinsNeeded = requiredCoins; // 不再有金币税
+        }
+
+        // 确保使用Web3Config中的税率
+        if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.TAX_RATE !== undefined) {
+            this.config.TOKEN_TAX_PERCENT = Web3Config.EXCHANGE.TAX_RATE / 100; // 基点转换为百分比
         }
 
         // 计算代币税
