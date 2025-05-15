@@ -102,21 +102,32 @@ const TokenRecharge = {
 
                     // 获取代币税率
                     try {
-                        const taxRates = await Web3TokenContract.getTokenTaxRates();
-                        if (taxRates) {
-                            console.log('获取到代币税率:', taxRates);
+                        // 检查是否已经从Web3Config加载了税率
+                        let taxRateFromConfig = false;
+                        if (typeof Web3Config !== 'undefined' && Web3Config.RECHARGE && Web3Config.RECHARGE.TAX_RATE !== undefined) {
+                            taxRateFromConfig = true;
+                            this.config.TOKEN_TAX_PERCENT = Web3Config.RECHARGE.TAX_RATE / 100; // 基点转换为百分比
+                            console.log('已从Web3Config加载充值代币税率:', this.config.TOKEN_TAX_PERCENT, '%');
+                        }
 
-                            // 更新充值代币税率
-                            if (taxRates.rechargeTokenTaxRate !== undefined) {
-                                this.config.TOKEN_TAX_PERCENT = taxRates.rechargeTokenTaxRate / 100;
-                                console.log('更新充值代币税率为:', this.config.TOKEN_TAX_PERCENT, '%');
+                        // 如果没有从Web3Config加载税率，才从合约获取
+                        if (!taxRateFromConfig) {
+                            const taxRates = await Web3TokenContract.getTokenTaxRates();
+                            if (taxRates) {
+                                console.log('获取到代币税率:', taxRates);
 
-                                // 更新UI中的代币税率和金币税率
-                                // 在初始化时，UI可能还没有创建，所以我们需要在show方法中更新
-                                this.updateTaxRateUI();
-                                this.updateFeeRateUI();
+                                // 更新充值代币税率
+                                if (taxRates.rechargeTokenTaxRate !== undefined) {
+                                    this.config.TOKEN_TAX_PERCENT = taxRates.rechargeTokenTaxRate / 100;
+                                    console.log('更新充值代币税率为:', this.config.TOKEN_TAX_PERCENT, '%');
+                                }
                             }
                         }
+
+                        // 更新UI中的代币税率和金币税率
+                        // 在初始化时，UI可能还没有创建，所以我们需要在show方法中更新
+                        this.updateTaxRateUI();
+                        this.updateFeeRateUI();
                     } catch (taxError) {
                         console.warn('获取代币税率失败:', taxError);
                     }
@@ -526,6 +537,12 @@ const TokenRecharge = {
             this.config.COINS_PER_TOKEN = rechargeConfig.RATE;
             this.config.RECHARGE_FEE_PERCENT = rechargeConfig.TAX_RATE / 100; // 将基点转换为百分比
 
+            // 确保使用Web3Config中的代币税率
+            if (Web3Config.RECHARGE && Web3Config.RECHARGE.TAX_RATE !== undefined) {
+                this.config.TOKEN_TAX_PERCENT = Web3Config.RECHARGE.TAX_RATE / 100; // 基点转换为百分比
+                console.log('从Web3Config更新充值代币税率:', this.config.TOKEN_TAX_PERCENT, '%');
+            }
+
             // 获取代币信息
             const tokenConfig = Web3Config.getToken();
             if (tokenConfig) {
@@ -722,6 +739,11 @@ const TokenRecharge = {
 
         const actualCoinsAfterFee = correctedCoins - coinsFeeAmount;
         console.log('扣除金币税后的金币数量:', actualCoinsAfterFee);
+
+        // 确保使用Web3Config中的代币税率
+        if (typeof Web3Config !== 'undefined' && Web3Config.RECHARGE && Web3Config.RECHARGE.TAX_RATE !== undefined) {
+            this.config.TOKEN_TAX_PERCENT = Web3Config.RECHARGE.TAX_RATE / 100; // 基点转换为百分比
+        }
 
         // 计算代币税
         const tokenTaxPercentage = this.config.TOKEN_TAX_PERCENT / 100;
@@ -950,7 +972,6 @@ const TokenRecharge = {
                         // 根据合约中的计算逻辑调整代币数量
                         // 合约中的计算: expectedGameCoins = tokenAmount * 1e18 / exchangeRate / (10**decimals)
                         // 我们需要确保传入的tokenAmount与此计算结果匹配
-                        const exchangeRate = this.config.COINS_PER_TOKEN;
                         // 不需要调整，因为充值时用户直接输入代币数量，而不是金币数量
                         console.log('反向兑换模式 - 使用原始代币数量:', adjustedTokenAmount);
                     }
