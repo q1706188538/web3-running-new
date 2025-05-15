@@ -33,8 +33,33 @@ const TokenExchange = {
 
         console.log('初始化代币兑换模块...');
 
-        // 从GameConfig获取配置
-        if (typeof GameConfig !== 'undefined' && GameConfig.TOKEN_EXCHANGE) {
+        // 首先尝试从Web3Config获取配置
+        if (typeof Web3Config !== 'undefined') {
+            // 更新配置
+            if (Web3Config.TOKEN && Web3Config.TOKEN.NAME) {
+                this.config.TOKEN_NAME = Web3Config.TOKEN.NAME;
+            }
+
+            if (Web3Config.EXCHANGE && Web3Config.EXCHANGE.RATE) {
+                this.config.COINS_PER_TOKEN = Web3Config.EXCHANGE.RATE;
+            }
+
+            if (Web3Config.EXCHANGE && Web3Config.EXCHANGE.MIN_AMOUNT) {
+                this.config.MIN_EXCHANGE_AMOUNT = Web3Config.EXCHANGE.MIN_AMOUNT;
+            }
+
+            if (Web3Config.EXCHANGE && Web3Config.EXCHANGE.MAX_AMOUNT) {
+                this.config.MAX_EXCHANGE_AMOUNT = Web3Config.EXCHANGE.MAX_AMOUNT;
+            }
+
+            if (Web3Config.EXCHANGE && Web3Config.EXCHANGE.TAX_RATE) {
+                this.config.TOKEN_TAX_PERCENT = Web3Config.EXCHANGE.TAX_RATE / 100; // 基点转换为百分比
+            }
+
+            console.log('从Web3Config加载代币兑换配置:', this.config);
+        }
+        // 如果Web3Config不存在或没有配置，尝试从GameConfig中获取
+        else if (typeof GameConfig !== 'undefined' && GameConfig.TOKEN_EXCHANGE) {
             this.config = GameConfig.TOKEN_EXCHANGE;
             console.log('从GameConfig加载代币兑换配置:', this.config);
         }

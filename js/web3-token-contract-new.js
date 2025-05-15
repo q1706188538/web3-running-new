@@ -250,8 +250,12 @@ const Web3TokenContract = {
                 // 如果没有检测到Web3，使用远程节点
                 console.warn('未检测到Web3，使用远程节点');
 
-                // 使用BSC测试网节点
-                const provider = new Web3.providers.HttpProvider('https://data-seed-prebsc-1-s1.binance.org:8545/');
+                // 从配置中获取RPC URL
+                const rpcUrl = this.getRpcUrlFromConfig();
+                console.log('使用配置的RPC URL:', rpcUrl);
+
+                // 使用配置的RPC URL
+                const provider = new Web3.providers.HttpProvider(rpcUrl);
                 this.web3 = new Web3(provider);
 
                 console.log('使用远程节点初始化Web3');
@@ -314,35 +318,159 @@ const Web3TokenContract = {
 
     // 从配置中获取合约地址
     getContractAddressFromConfig: function() {
-        // 从GameConfig中获取合约地址
+        // 首先尝试从Web3Config中获取
+        if (typeof Web3Config !== 'undefined') {
+            if (Web3Config.BRIDGE_CONTRACT && Web3Config.BRIDGE_CONTRACT.ADDRESS) {
+                console.log('从Web3Config获取合约地址:', Web3Config.BRIDGE_CONTRACT.ADDRESS);
+                return Web3Config.BRIDGE_CONTRACT.ADDRESS;
+            }
+        }
+
+        // 如果Web3Config不存在或没有配置，尝试从GameConfig中获取
         if (typeof GameConfig !== 'undefined') {
             // 首先尝试从TOKEN_EXCHANGE获取
             if (GameConfig.TOKEN_EXCHANGE && GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS) {
+                console.log('从GameConfig.TOKEN_EXCHANGE获取合约地址:', GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS);
                 return GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS;
             }
 
             // 如果没有，尝试从TOKEN_RECHARGE获取
             if (GameConfig.TOKEN_RECHARGE && GameConfig.TOKEN_RECHARGE.CONTRACT_ADDRESS) {
+                console.log('从GameConfig.TOKEN_RECHARGE获取合约地址:', GameConfig.TOKEN_RECHARGE.CONTRACT_ADDRESS);
                 return GameConfig.TOKEN_RECHARGE.CONTRACT_ADDRESS;
             }
         }
 
         // 如果都没有配置，记录错误并返回空字符串
-        console.error('未找到合约地址配置，请检查GameConfig');
+        console.error('未找到合约地址配置，请检查Web3Config或GameConfig');
         return '';
     },
 
     // 从配置中获取游戏服务器地址
     getGameServerAddressFromConfig: function() {
-        // 从GameConfig中获取游戏服务器地址
+        // 首先尝试从Web3Config中获取
+        if (typeof Web3Config !== 'undefined') {
+            if (Web3Config.BRIDGE_CONTRACT && Web3Config.BRIDGE_CONTRACT.GAME_SERVER_ADDRESS) {
+                console.log('从Web3Config获取游戏服务器地址:', Web3Config.BRIDGE_CONTRACT.GAME_SERVER_ADDRESS);
+                return Web3Config.BRIDGE_CONTRACT.GAME_SERVER_ADDRESS;
+            }
+        }
+
+        // 如果Web3Config不存在或没有配置，尝试从GameConfig中获取
         if (typeof GameConfig !== 'undefined' &&
             GameConfig.TOKEN_EXCHANGE &&
             GameConfig.TOKEN_EXCHANGE.GAME_SERVER_ADDRESS) {
+            console.log('从GameConfig获取游戏服务器地址:', GameConfig.TOKEN_EXCHANGE.GAME_SERVER_ADDRESS);
             return GameConfig.TOKEN_EXCHANGE.GAME_SERVER_ADDRESS;
         }
 
         // 如果没有配置，返回默认游戏服务器地址
+        console.warn('未找到游戏服务器地址配置，使用默认值');
         return '0x599321e71a41bd2629034b0353b93cff56ebaeca';
+    },
+
+    // 从配置中获取税收钱包地址
+    getTaxWalletAddressFromConfig: function() {
+        // 首先尝试从Web3Config中获取
+        if (typeof Web3Config !== 'undefined') {
+            if (Web3Config.BRIDGE_CONTRACT && Web3Config.BRIDGE_CONTRACT.TAX_WALLET_ADDRESS) {
+                console.log('从Web3Config获取税收钱包地址:', Web3Config.BRIDGE_CONTRACT.TAX_WALLET_ADDRESS);
+                return Web3Config.BRIDGE_CONTRACT.TAX_WALLET_ADDRESS;
+            }
+        }
+
+        // 如果Web3Config不存在或没有配置，尝试从GameConfig中获取
+        if (typeof GameConfig !== 'undefined') {
+            // 首先尝试从TOKEN_EXCHANGE获取
+            if (GameConfig.TOKEN_EXCHANGE && GameConfig.TOKEN_EXCHANGE.TAX_WALLET_ADDRESS) {
+                console.log('从GameConfig.TOKEN_EXCHANGE获取税收钱包地址:', GameConfig.TOKEN_EXCHANGE.TAX_WALLET_ADDRESS);
+                return GameConfig.TOKEN_EXCHANGE.TAX_WALLET_ADDRESS;
+            }
+
+            // 如果没有，尝试从TOKEN_RECHARGE获取
+            if (GameConfig.TOKEN_RECHARGE && GameConfig.TOKEN_RECHARGE.TAX_WALLET_ADDRESS) {
+                console.log('从GameConfig.TOKEN_RECHARGE获取税收钱包地址:', GameConfig.TOKEN_RECHARGE.TAX_WALLET_ADDRESS);
+                return GameConfig.TOKEN_RECHARGE.TAX_WALLET_ADDRESS;
+            }
+        }
+
+        // 如果都没有配置，返回默认值
+        console.warn('未找到税收钱包地址配置，使用默认值');
+        return '0x828E565E19572aE99c2aE9fa2833E72FB16F8946';
+    },
+
+    // 从配置中获取合约所有者地址
+    getOwnerAddressFromConfig: function() {
+        // 首先尝试从Web3Config中获取
+        if (typeof Web3Config !== 'undefined') {
+            if (Web3Config.BRIDGE_CONTRACT && Web3Config.BRIDGE_CONTRACT.OWNER_ADDRESS) {
+                console.log('从Web3Config获取合约所有者地址:', Web3Config.BRIDGE_CONTRACT.OWNER_ADDRESS);
+                return Web3Config.BRIDGE_CONTRACT.OWNER_ADDRESS;
+            }
+        }
+
+        // 如果Web3Config不存在或没有配置，尝试从GameConfig中获取
+        if (typeof GameConfig !== 'undefined') {
+            // 首先尝试从TOKEN_EXCHANGE获取
+            if (GameConfig.TOKEN_EXCHANGE && GameConfig.TOKEN_EXCHANGE.TOKEN_HOLDER_ADDRESS) {
+                console.log('从GameConfig.TOKEN_EXCHANGE获取合约所有者地址:', GameConfig.TOKEN_EXCHANGE.TOKEN_HOLDER_ADDRESS);
+                return GameConfig.TOKEN_EXCHANGE.TOKEN_HOLDER_ADDRESS;
+            }
+
+            // 如果没有，尝试从TOKEN_RECHARGE获取
+            if (GameConfig.TOKEN_RECHARGE && GameConfig.TOKEN_RECHARGE.TOKEN_HOLDER_ADDRESS) {
+                console.log('从GameConfig.TOKEN_RECHARGE获取合约所有者地址:', GameConfig.TOKEN_RECHARGE.TOKEN_HOLDER_ADDRESS);
+                return GameConfig.TOKEN_RECHARGE.TOKEN_HOLDER_ADDRESS;
+            }
+        }
+
+        // 如果都没有配置，返回默认值
+        console.warn('未找到合约所有者地址配置，使用默认值');
+        return '0xcf0d5de2ad5be4d1721fb77b99ac738d3f2a4444';
+    },
+
+    // 从配置中获取网络ID
+    getNetworkIdFromConfig: function() {
+        // 首先尝试从Web3Config中获取
+        if (typeof Web3Config !== 'undefined') {
+            if (Web3Config.NETWORK && Web3Config.NETWORK.ID) {
+                console.log('从Web3Config获取网络ID:', Web3Config.NETWORK.ID);
+                return Web3Config.NETWORK.ID;
+            }
+        }
+
+        // 如果Web3Config不存在或没有配置，尝试从GameConfig中获取
+        if (typeof GameConfig !== 'undefined') {
+            // 首先尝试从TOKEN_EXCHANGE获取
+            if (GameConfig.TOKEN_EXCHANGE && GameConfig.TOKEN_EXCHANGE.NETWORK_ID) {
+                console.log('从GameConfig.TOKEN_EXCHANGE获取网络ID:', GameConfig.TOKEN_EXCHANGE.NETWORK_ID);
+                return GameConfig.TOKEN_EXCHANGE.NETWORK_ID;
+            }
+
+            // 如果没有，尝试从TOKEN_RECHARGE获取
+            if (GameConfig.TOKEN_RECHARGE && GameConfig.TOKEN_RECHARGE.NETWORK_ID) {
+                console.log('从GameConfig.TOKEN_RECHARGE获取网络ID:', GameConfig.TOKEN_RECHARGE.NETWORK_ID);
+                return GameConfig.TOKEN_RECHARGE.NETWORK_ID;
+            }
+        }
+
+        // 如果都没有配置，返回默认值97（BSC测试网）
+        console.warn('未找到网络ID配置，使用默认值97（BSC测试网）');
+        return 97;
+    },
+
+    // 从配置中获取RPC URL
+    getRpcUrlFromConfig: function() {
+        // 首先尝试从Web3Config中获取
+        if (typeof Web3Config !== 'undefined') {
+            if (Web3Config.NETWORK && Web3Config.NETWORK.RPC_URL) {
+                console.log('从Web3Config获取RPC URL:', Web3Config.NETWORK.RPC_URL);
+                return Web3Config.NETWORK.RPC_URL;
+            }
+        }
+
+        // 如果没有配置，返回默认值
+        return 'https://data-seed-prebsc-1-s1.binance.org:8545/';
     },
 
     // 获取代币信息
