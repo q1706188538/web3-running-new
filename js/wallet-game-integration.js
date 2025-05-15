@@ -3,33 +3,46 @@
  * 用于处理钱包与游戏之间的交互
  */
 const WalletGameIntegration = {
-    // 初始化
+    isFullyInitialized: false, // 新增标志
+
+    // 初始化 - 这个init现在只做最基础的、不依赖Web3Config加载完成的设置
     init: function() {
-        console.log('初始化钱包游戏集成...');
+        console.log('WalletGameIntegration: Base init (event listeners setup)...');
 
-        // 监听钱包连接事件
+        // 监听钱包连接事件 (这些可以保留，因为它们不直接在连接时就读取大量配置)
         if (typeof GEMIOLI !== 'undefined' && GEMIOLI.Application) {
-            // 监听钱包连接事件
             GEMIOLI.Application.addEventListener('wallet_connected', this.onWalletConnected.bind(this));
-
-            // 监听钱包断开连接事件
             GEMIOLI.Application.addEventListener('wallet_disconnected', this.onWalletDisconnected.bind(this));
-
-            // 我们不再使用事件监听器来捕获游戏开始和结束
-            // 而是直接监听游戏中的关键变量和场景加载
-
-            // 只保留钱包连接和断开连接的事件监听器
-            // 其他事件通过我们自己的监视器来捕获
         }
+        // 注意：原先的 setupPlayerDeadMonitor 和 setupSceneLoadMonitor 将移到 deferredInit
+        console.log('WalletGameIntegration: Base init complete. Waiting for web3ConfigLoaded for full initialization.');
+    },
 
-        // 设置玩家死亡状态监视器，这是游戏结束的关键标志
+    // 新增的延迟初始化方法
+    deferredInit: function() {
+        if (this.isFullyInitialized) {
+            console.log('WalletGameIntegration: Already fully initialized.');
+            return;
+        }
+        console.log('WalletGameIntegration: Deferred initialization started (Web3Config loaded)...');
+
+        // 将原先在 init 中或顶层执行的、依赖配置的初始化移到这里
         this.setupPlayerDeadMonitor();
-
-        // 设置场景加载监视器，捕获游戏开始场景加载
         this.setupSceneLoadMonitor();
 
-        // 不再从游戏容器判断钱包状态
-        // 也不再操作游戏容器显示状态
+        // TODO: 检查并确保其他依赖Web3Config的子模块初始化也在这里被调用
+        // 例如，如果TokenExchange和TokenRecharge的初始化是由这个模块触发的：
+        // if (typeof TokenExchange !== 'undefined' && typeof TokenExchange.init === 'function') {
+        //     console.log('WalletGameIntegration: Initializing TokenExchange module...');
+        //     TokenExchange.init(); // 确保 TokenExchange.init 内部也正确使用 Web3Config
+        // }
+        // if (typeof TokenRecharge !== 'undefined' && typeof TokenRecharge.init === 'function') {
+        //     console.log('WalletGameIntegration: Initializing TokenRecharge module...');
+        //     TokenRecharge.init(); // 确保 TokenRecharge.init 内部也正确使用 Web3Config
+        // }
+
+        this.isFullyInitialized = true;
+        console.log('WalletGameIntegration: Deferred initialization complete.');
     },
 
     // 钱包连接事件处理
@@ -897,3 +910,17 @@ const WalletGameIntegration = {
         };
     }
 };
+
+// Ensure WalletGameIntegration.init() is called if it's the entry point for basic setup.
+// This might be called from index.html or another main script.
+// For now, we assume the base init (if any) is called elsewhere or not strictly needed before deferredInit.
+// WalletGameIntegration.init(); // Call base init if it's safe and necessary before web3ConfigLoaded
+
+window.addEventListener('web3ConfigLoaded', function() {
+    console.log('WalletGameIntegration: Received web3ConfigLoaded event, calling deferredInit.');
+    if (WalletGameIntegration && typeof WalletGameIntegration.deferredInit === 'function') {
+        WalletGameIntegration.deferredInit();
+    } else {
+        console.error('WalletGameIntegration or WalletGameIntegration.deferredInit is not defined when web3ConfigLoaded was dispatched.');
+    }
+});

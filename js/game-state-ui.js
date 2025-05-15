@@ -276,13 +276,16 @@
         prepareUIPrototype: function() {
             if (DEBUG) console.log('准备UI原型方法...');
 
-            if (!GEMIOLI || !GEMIOLI.Play || !GEMIOLI.Play.prototype) {
-                console.error('无法访问GEMIOLI.Play.prototype');
+            if (!GEMIOLI || !GEMIOLI.Play || typeof GEMIOLI.Play !== 'object') {
+                console.error('GEMIOLI.Play 不是一个有效的对象实例，无法添加UI方法');
                 return;
             }
 
-            // 为GEMIOLI.Play添加initStateUI方法
-            GEMIOLI.Play.prototype.initStateUI = function() {
+            const playInstance = GEMIOLI.Play;
+
+            // 为GEMIOLI.Play实例添加initStateUI方法 (如果不存在)
+            if (typeof playInstance.initStateUI !== 'function') {
+                playInstance.initStateUI = function() {
                 if (this.stateContainer) {
                     return; // 已初始化，避免重复
                 }
@@ -386,10 +389,13 @@
                 } catch(e) {
                     console.error('初始化UI时出错:', e);
                 }
-            };
+                };
+                if (DEBUG) console.log('initStateUI 方法已直接添加到 GEMIOLI.Play 实例');
+            }
 
-            // 给GEMIOLI.Play添加showStateUI方法
-            GEMIOLI.Play.prototype.showStateUI = function() {
+            // 为GEMIOLI.Play实例添加showStateUI方法 (如果不存在)
+            if (typeof playInstance.showStateUI !== 'function') {
+                playInstance.showStateUI = function() {
                 try {
                     if (this.stateContainer) {
                         this.stateContainer.visible = true;
@@ -399,41 +405,33 @@
                 } catch(e) {
                     console.error('显示UI时出错:', e);
                 }
-            };
+                };
+                if (DEBUG) console.log('showStateUI 方法已直接添加到 GEMIOLI.Play 实例');
+            }
 
-            // 修改Play的update方法，添加状态UI更新
-            if (typeof GEMIOLI.Play.prototype.update === 'function') {
-                var originalUpdate = GEMIOLI.Play.prototype.update;
-                GEMIOLI.Play.prototype.update = function(dt) {
+            // 修改Play实例的update方法 (如果存在且未被修改过)
+            if (typeof playInstance.update === 'function' && !playInstance._updatePatchedByGameStateUI) {
+                var originalUpdate = playInstance.update;
+                playInstance.update = function(dt) {
                     // 调用原始update方法
                     originalUpdate.apply(this, arguments);
-                    
+
                     // 启用状态UI更新
                     if (window.GameStateUI && Date.now() - window.GameStateUI.lastRefreshTime > 10000) {
                         // 如果超过10秒没有刷新，则刷新数据
                         window.GameStateUI.fetchUserData();
                     }
                 };
+                playInstance._updatePatchedByGameStateUI = true; // 标记已修改
+                if (DEBUG) console.log('update 方法已在 GEMIOLI.Play 实例上被增强');
             }
 
-            // 静态方法，便于全局调用
-            GEMIOLI.Play.showStateUI = function() {
-                try {
-                    if (GEMIOLI.Application && GEMIOLI.Application.currentLayer &&
-                    GEMIOLI.Application.currentLayer instanceof GEMIOLI.Play) {
-                    GEMIOLI.Application.currentLayer.showStateUI();
-                } else {
-                        console.warn('当前层不是Play层，无法显示UI');
-                    }
-                } catch(e) {
-                    console.error('静态showStateUI方法出错:', e);
-                }
-            };
+            // 不再需要静态的 GEMIOLI.Play.showStateUI，因为我们会直接在实例上调用
 
-            // 给GEMIOLI.Play.prototype.prepend添加初始化调用
-            if (typeof GEMIOLI.Play.prototype.prepend === 'function') {
-            var originalPrepend = GEMIOLI.Play.prototype.prepend;
-            GEMIOLI.Play.prototype.prepend = function() {
+            // 修改Play实例的prepend方法 (如果存在且未被修改过)
+            if (typeof playInstance.prepend === 'function' && !playInstance._prependPatchedByGameStateUI) {
+            var originalPrepend = playInstance.prepend;
+            playInstance.prepend = function() {
                     try {
                 // 先调用原始的prepend方法
                 originalPrepend.apply(this, arguments);
@@ -450,12 +448,14 @@
                     } catch(e) {
                         console.error('prepend方法执行出错:', e);
                         // 仍然尝试初始化
-                        this.initStateUI();
+                        this.initStateUI(); // this 指向 playInstance
                     }
                 };
+                playInstance._prependPatchedByGameStateUI = true; // 标记已修改
+                if (DEBUG) console.log('prepend 方法已在 GEMIOLI.Play 实例上被增强');
             }
 
-            if (DEBUG) console.log('UI原型方法准备完成');
+            if (DEBUG) console.log('UI 方法已准备并直接应用到 GEMIOLI.Play 实例');
         },
 
         // 在当前Play实例上应用UI
@@ -510,18 +510,16 @@
             if (GEMIOLI.Play) {
                 console.log('找到GEMIOLI.Play，尝试添加initStateUI方法');
                 
-                // 确保prototype存在
-                if (!GEMIOLI.Play.prototype) {
-                    GEMIOLI.Play.prototype = {};
-                }
-                
-                // 添加initStateUI方法
-                if (!GEMIOLI.Play.prototype.initStateUI) {
+                // 如果 GEMIOLI.Play 实例上没有 initStateUI，说明 prepareUIPrototype 未成功或未在其上正确设置
+                // 直接调用 prepareUIPrototype，它现在会尝试在实例上定义方法
+                if (typeof GEMIOLI.Play.initStateUI !== 'function') {
+                    console.log('GEMIOLI.Play 实例上缺少 initStateUI，调用 prepareUIPrototype...');
                     this.prepareUIPrototype();
                 }
-                
-                // 再次尝试应用UI
+
+                // 再次尝试应用UI，此时 prepareUIPrototype 应该已经在实例上添加了方法
                 setTimeout(() => {
+                    console.log('尝试修复后，再次应用UI...');
                     this.applyUIToCurrentPlay(0);
                 }, 1000);
             }

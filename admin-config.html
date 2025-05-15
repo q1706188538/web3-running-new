@@ -1,0 +1,173 @@
+<![CDATA[
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web3 配置管理</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2 { color: #333; }
+        .config-section { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9;}
+        .config-section h2 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="number"], select {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        input[type="checkbox"] { margin-right: 5px; vertical-align: middle; }
+        .checkbox-label { font-weight: normal; }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover { background-color: #0056b3; }
+        #messageArea { margin-top: 20px; padding: 10px; border-radius: 4px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;}
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Web3 配置管理</h1>
+
+        <form id="web3ConfigForm">
+            <!-- GAME Config -->
+            <div class="config-section">
+                <h2>游戏基础配置 (GAME)</h2>
+                <label for="gameStartCost">游戏开始金币 (START_COST):</label>
+                <input type="number" id="gameStartCost" name="GAME.START_COST">
+
+                <label for="gameRestartCost">再来一次金币 (RESTART_COST):</label>
+                <input type="number" id="gameRestartCost" name="GAME.RESTART_COST">
+
+                <label>
+                    <input type="checkbox" id="gameDebugMode" name="GAME.DEBUG_MODE">
+                    <span class="checkbox-label">调试模式 (DEBUG_MODE)</span>
+                </label>
+
+                <label>
+                    <input type="checkbox" id="gameUseApi" name="GAME.USE_API">
+                    <span class="checkbox-label">使用API (USE_API)</span>
+                </label>
+
+                <label for="gameApiBaseUrl">API基础URL (API_BASE_URL):</label>
+                <input type="text" id="gameApiBaseUrl" name="GAME.API_BASE_URL">
+            </div>
+
+            <!-- NETWORK Config -->
+            <div class="config-section">
+                <h2>网络配置 (NETWORK)</h2>
+                <label for="networkId">网络ID (ID):</label>
+                <input type="number" id="networkId" name="NETWORK.ID">
+
+                <label for="networkName">网络名称 (NAME):</label>
+                <input type="text" id="networkName" name="NETWORK.NAME">
+
+                <label for="networkRpcUrl">RPC URL (RPC_URL):</label>
+                <input type="text" id="networkRpcUrl" name="NETWORK.RPC_URL">
+
+                <label for="networkExplorerUrl">区块浏览器URL (EXPLORER_URL):</label>
+                <input type="text" id="networkExplorerUrl" name="NETWORK.EXPLORER_URL">
+            </div>
+
+            <!-- BRIDGE_CONTRACT Config -->
+            <div class="config-section">
+                <h2>桥接合约配置 (BRIDGE_CONTRACT)</h2>
+                <label for="bridgeContractAddress">合约地址 (ADDRESS):</label>
+                <input type="text" id="bridgeContractAddress" name="BRIDGE_CONTRACT.ADDRESS">
+
+                <label for="bridgeContractOwnerAddress">所有者地址 (OWNER_ADDRESS):</label>
+                <input type="text" id="bridgeContractOwnerAddress" name="BRIDGE_CONTRACT.OWNER_ADDRESS">
+
+                <label for="bridgeContractGameServerAddress">游戏服务器地址 (GAME_SERVER_ADDRESS):</label>
+                <input type="text" id="bridgeContractGameServerAddress" name="BRIDGE_CONTRACT.GAME_SERVER_ADDRESS">
+
+                <label for="bridgeContractTaxWalletAddress">税收钱包地址 (TAX_WALLET_ADDRESS):</label>
+                <input type="text" id="bridgeContractTaxWalletAddress" name="BRIDGE_CONTRACT.TAX_WALLET_ADDRESS">
+            </div>
+
+            <!-- TOKEN Config -->
+            <div class="config-section">
+                <h2>代币配置 (TOKEN)</h2>
+                <label for="tokenName">名称 (NAME):</label>
+                <input type="text" id="tokenName" name="TOKEN.NAME">
+
+                <label for="tokenSymbol">符号 (SYMBOL):</label>
+                <input type="text" id="tokenSymbol" name="TOKEN.SYMBOL">
+
+                <label for="tokenDecimals">小数位数 (DECIMALS):</label>
+                <input type="number" id="tokenDecimals" name="TOKEN.DECIMALS">
+
+                <label for="tokenAddress">合约地址 (ADDRESS):</label>
+                <input type="text" id="tokenAddress" name="TOKEN.ADDRESS">
+            </div>
+
+            <!-- EXCHANGE Config -->
+            <div class="config-section">
+                <h2>兑换配置 (EXCHANGE)</h2>
+                <label for="exchangeRate">兑换比例 (RATE):</label>
+                <input type="number" id="exchangeRate" name="EXCHANGE.RATE">
+                <small>例如: 100 (表示100个代币 = 1个游戏金币, 如果INVERSE_MODE为true)</small><br><br>
+
+                <label>
+                    <input type="checkbox" id="exchangeInverseMode" name="EXCHANGE.INVERSE_MODE">
+                    <span class="checkbox-label">反向兑换模式 (INVERSE_MODE)</span>
+                </label>
+
+                <label for="exchangeMinAmount">最小兑换金额(代币) (MIN_AMOUNT):</label>
+                <input type="number" id="exchangeMinAmount" name="EXCHANGE.MIN_AMOUNT">
+
+                <label for="exchangeMaxAmount">最大兑换金额(代币) (MAX_AMOUNT):</label>
+                <input type="number" id="exchangeMaxAmount" name="EXCHANGE.MAX_AMOUNT">
+
+                <label for="exchangeTaxRate">税率(基点) (TAX_RATE):</label>
+                <input type="number" id="exchangeTaxRate" name="EXCHANGE.TAX_RATE">
+                <small>例如: 1000 (表示10%)</small><br><br>
+            </div>
+
+            <!-- RECHARGE Config -->
+            <div class="config-section">
+                <h2>充值配置 (RECHARGE)</h2>
+                <label for="rechargeRate">充值比例 (RATE):</label>
+                <input type="number" id="rechargeRate" name="RECHARGE.RATE">
+                 <small>例如: 100 (表示100个代币 = 1个游戏金币, 如果INVERSE_MODE为true)</small><br><br>
+
+                <label>
+                    <input type="checkbox" id="rechargeInverseMode" name="RECHARGE.INVERSE_MODE">
+                    <span class="checkbox-label">反向兑换模式 (INVERSE_MODE)</span>
+                </label>
+
+                <label for="rechargeMinAmount">最小充值金额(代币) (MIN_AMOUNT):</label>
+                <input type="number" id="rechargeMinAmount" name="RECHARGE.MIN_AMOUNT">
+
+                <label for="rechargeMaxAmount">最大充值金额(代币) (MAX_AMOUNT):</label>
+                <input type="number" id="rechargeMaxAmount" name="RECHARGE.MAX_AMOUNT">
+
+                <label for="rechargeTaxRate">税率(基点) (TAX_RATE):</label>
+                <input type="number" id="rechargeTaxRate" name="RECHARGE.TAX_RATE">
+                <small>例如: 0 (表示0%)</small><br><br>
+            </div>
+
+            <button type="button" id="loadConfigBtn">加载当前配置</button>
+            <button type="submit" id="saveConfigBtn">保存配置</button>
+        </form>
+
+        <div id="messageArea"></div>
+    </div>
+
+    <script src="admin-config.js"></script>
+</body>
+</html>
+]]>

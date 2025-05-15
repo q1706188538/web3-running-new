@@ -26,7 +26,7 @@ const Web3Config = {
     BRIDGE_CONTRACT: {
         ADDRESS: "0xf54677367e6D3511DCa4C336EfE31eaDFc0cDc1b",  // 桥接合约地址（新部署的合约地址）
         OWNER_ADDRESS: "0x744b9acff32f9184c6f6639e6536437e975a4444",  // 合约所有者地址
-        GAME_SERVER_ADDRESS: "0xadd34cadc4f69c65fb38c1ceecec707f05865163",  // 游戏服务器地址
+        GAME_SERVER_ADDRESS: "0xE628408B47918c17cf6B97dDfa2A27c9a1CF451d",  // 游戏服务器地址 (恢复原始值)
         TAX_WALLET_ADDRESS: "0xedea273fbfad20943aa75d3d77646b23a63707a9"  // 税收钱包地址
     },
 
@@ -108,40 +108,71 @@ const Web3Config = {
      * 初始化配置
      * 可以在这里添加从服务器获取配置的逻辑
      */
-    init: function() {
-        console.log('初始化Web3配置...');
+    init: async function() { // 声明为 async 函数
+        console.log('Web3Config: 初始化Web3配置...'); // 添加前缀以区分
 
-        // 设置全局调试模式
-        window.DEBUG_MODE = this.GAME.DEBUG_MODE;
+        try {
+            console.log('Web3Config: 尝试从服务器获取动态Web3配置...');
+            const response = await fetch('/api/web3-config');
+            if (!response.ok) {
+                throw new Error(`获取配置失败: ${response.status} ${response.statusText}`);
+            }
+            const liveConfig = await response.json();
+            console.log('Web3Config: 从服务器获取到的动态配置:', liveConfig);
 
-        // 如果存在WalletProgress，设置是否使用API
-        if (typeof WalletProgress !== 'undefined') {
-            WalletProgress.useApi = this.GAME.USE_API;
+            if (liveConfig && typeof liveConfig === 'object' && Object.keys(liveConfig).length > 0) {
+                if (liveConfig.GAME) {
+                    Object.assign(this.GAME, liveConfig.GAME);
+                    console.log('Web3Config: GAME配置已更新:', this.GAME);
+                }
+                if (liveConfig.NETWORK) {
+                    Object.assign(this.NETWORK, liveConfig.NETWORK);
+                    console.log('Web3Config: NETWORK配置已更新:', this.NETWORK);
+                }
+                if (liveConfig.BRIDGE_CONTRACT) {
+                    Object.assign(this.BRIDGE_CONTRACT, liveConfig.BRIDGE_CONTRACT);
+                    console.log('Web3Config: BRIDGE_CONTRACT配置已更新:', this.BRIDGE_CONTRACT);
+                }
+                if (liveConfig.TOKEN) {
+                    Object.assign(this.TOKEN, liveConfig.TOKEN);
+                    console.log('Web3Config: TOKEN配置已更新:', this.TOKEN);
+                }
+                if (liveConfig.EXCHANGE) {
+                    Object.assign(this.EXCHANGE, liveConfig.EXCHANGE);
+                    console.log('Web3Config: EXCHANGE配置已更新:', this.EXCHANGE);
+                }
+                if (liveConfig.RECHARGE) {
+                    Object.assign(this.RECHARGE, liveConfig.RECHARGE);
+                    console.log('Web3Config: RECHARGE配置已更新:', this.RECHARGE);
+                }
+                console.log('Web3Config: 配置已从服务器动态更新。');
+            } else {
+                console.log('Web3Config: 服务器未返回有效动态配置，或配置为空，将使用本地默认值。');
+            }
+        } catch (error) {
+            console.error('Web3Config: 获取或应用动态Web3配置失败，将使用本地默认值:', error);
         }
 
-        // 这里可以添加从服务器获取最新配置的逻辑
-        // 例如：
-        // fetch('/api/web3-config')
-        //     .then(response => response.json())
-        //     .then(config => {
-        //         this.NETWORK = config.network;
-        //         this.BRIDGE_CONTRACT = config.bridgeContract;
-        //         this.TOKEN = config.token;
-        //         this.EXCHANGE = config.exchange;
-        //         this.RECHARGE = config.recharge;
-        //         this.GAME = config.game;
-        //         console.log('Web3配置已从服务器更新');
-        //     })
-        //     .catch(error => {
-        //         console.error('获取Web3配置失败:', error);
-        //     });
+        window.DEBUG_MODE = this.GAME.DEBUG_MODE;
+        console.log('Web3Config: DEBUG_MODE设置为:', window.DEBUG_MODE);
 
-        console.log('Web3配置初始化完成');
+        if (typeof WalletProgress !== 'undefined') {
+            WalletProgress.useApi = this.GAME.USE_API;
+            console.log('Web3Config: WalletProgress.useApi设置为:', WalletProgress.useApi);
+        }
+
+        console.log('Web3Config: 初始化完成。最终生效配置:', this);
+
+        // 触发配置加载完成事件
+        const event = new CustomEvent('web3ConfigLoaded', { detail: this });
+        window.dispatchEvent(event);
+        console.log('Web3Config: dispatched web3ConfigLoaded event.');
     }
 };
 
 // 在页面加载完成后初始化
-window.addEventListener('DOMContentLoaded', function() {
+window.addEventListener('DOMContentLoaded', async function() { // 修改为 async
     // 初始化Web3配置
-    Web3Config.init();
+    await Web3Config.init(); // 使用 await 确保配置加载完成
+    // 其他依赖 Web3Config 完全初始化的模块现在应该监听 'web3ConfigLoaded' 事件
 });

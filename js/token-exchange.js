@@ -1069,12 +1069,27 @@ const TokenExchange = {
 
                             console.log('- 反向兑换模式:', inverseMode);
 
+                            // 获取合约地址
+                            let contractAddressToUse = '';
+                            if (typeof Web3Config !== 'undefined' && Web3Config.BRIDGE_CONTRACT && Web3Config.BRIDGE_CONTRACT.ADDRESS) {
+                                contractAddressToUse = Web3Config.BRIDGE_CONTRACT.ADDRESS;
+                            } else if (typeof GameConfig !== 'undefined' && GameConfig.TOKEN_EXCHANGE && GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS) {
+                                // 保留 GameConfig 作为备用，但优先使用 Web3Config
+                                contractAddressToUse = GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS;
+                                console.warn('使用的是 GameConfig 中的合约地址作为备选:', contractAddressToUse);
+                            } else {
+                                console.error('错误：无法在 Web3Config 或 GameConfig 中找到有效的合约地址！');
+                                throw new Error('合约地址未配置，无法进行签名');
+                            }
+                            console.log('ApiService.getExchangeSignature 将使用的合约地址:', contractAddressToUse);
+
                             // 从API获取签名
                             signatureData = await ApiService.getExchangeSignature(
-                                this.walletAddress,
-                                tokenAmount,
-                                gameCoinsToUse,
-                                inverseMode  // 添加反向模式参数
+                                this.walletAddress,    // playerAddress
+                                tokenAmount,           // tokenAmount
+                                gameCoinsToUse,        // gameCoins
+                                contractAddressToUse,  // contractAddress - 使用从 Web3Config 获取的地址
+                                inverseMode            // isInverse - 正确传递
                             );
 
                             if (!signatureData || !signatureData.success) {

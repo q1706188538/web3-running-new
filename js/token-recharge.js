@@ -931,19 +931,37 @@ const TokenRecharge = {
                     if (typeof ApiService !== 'undefined') {
                         try {
                             // 检查是否使用反向兑换模式
-                            let inverseMode = false;
+                            // 获取合约地址
+                            let contractAddress = null;
+                            if (typeof Web3Config !== 'undefined' && Web3Config.BRIDGE_CONTRACT && Web3Config.BRIDGE_CONTRACT.ADDRESS) {
+                                contractAddress = Web3Config.BRIDGE_CONTRACT.ADDRESS;
+                            } else if (typeof GameConfig !== 'undefined' && GameConfig.TOKEN_RECHARGE && GameConfig.TOKEN_RECHARGE.CONTRACT_ADDRESS) {
+                                contractAddress = GameConfig.TOKEN_RECHARGE.CONTRACT_ADDRESS;
+                                console.warn("使用 GameConfig.TOKEN_RECHARGE.CONTRACT_ADDRESS 作为充值合约地址");
+                            } else if (typeof GameConfig !== 'undefined' && GameConfig.TOKEN_EXCHANGE && GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS) {
+                                contractAddress = GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS;
+                                console.warn("使用 GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS 作为充值合约地址 (通用备用)");
+                            }
+
+                            if (!contractAddress) {
+                                console.error('ApiService: 合约地址未在Web3Config或GameConfig中配置');
+                                throw new Error('合约地址配置缺失，无法获取签名');
+                            }
+                            console.log('ApiService.getRechargeSignature 将使用的合约地址:', contractAddress);
+
+                            // 检查是否使用反向兑换模式 (此模式不直接传递给 getRechargeSignature, 但可能用于后续合约调用)
+                            let inverseMode = false; // 对于充值，通常不是反向的
                             if (typeof Web3Config !== 'undefined' && Web3Config.RECHARGE && Web3Config.RECHARGE.INVERSE_MODE !== undefined) {
                                 inverseMode = Web3Config.RECHARGE.INVERSE_MODE;
                             }
-
-                            console.log('- 反向兑换模式:', inverseMode);
+                            console.log('- 反向兑换模式 (用于后续逻辑, 非签名参数):', inverseMode);
 
                             // 从API获取签名
                             signatureData = await ApiService.getRechargeSignature(
                                 this.walletAddress,
                                 tokenAmountToUse,
                                 gameCoinsToGain,
-                                inverseMode  // 添加反向模式参数
+                                contractAddress // 正确传递合约地址
                             );
 
                             if (!signatureData || !signatureData.success) {

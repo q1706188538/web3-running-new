@@ -22,6 +22,7 @@ const PORT = 9000; // 修改端口为9000，与前端一致
 
 // 数据存储目录
 const DATA_DIR = path.join(__dirname, 'data');
+const WEB3_CONFIG_FILE_PATH = path.join(DATA_DIR, 'web3-live-config.json'); // 新增：动态配置文件的路径
 
 // 确保数据目录存在
 if (!fs.existsSync(DATA_DIR)) {
@@ -1233,6 +1234,52 @@ app.post('/api/verify-game-data', (req, res) => {
             success: false,
             error: error.message || '验证游戏数据时出错'
         });
+    }
+});
+
+// --- Web3 Config API Endpoints ---
+
+// GET /api/web3-config - 获取当前动态Web3配置
+app.get('/api/web3-config', (req, res) => {
+    try {
+        if (fs.existsSync(WEB3_CONFIG_FILE_PATH)) {
+            const rawConfig = fs.readFileSync(WEB3_CONFIG_FILE_PATH, 'utf8');
+            const config = JSON.parse(rawConfig);
+            console.log(`[${new Date().toISOString()}] GET /api/web3-config - Served live config from file.`);
+            res.status(200).json(config);
+        } else {
+            // 如果动态配置文件不存在，返回空对象。客户端将使用其内置的默认值。
+            console.log(`[${new Date().toISOString()}] GET /api/web3-config - Live config file not found. Client to use defaults.`);
+            res.status(200).json({});
+        }
+    } catch (error) {
+        console.error(`[${new Date().toISOString()}] GET /api/web3-config - Error: ${error.message}`);
+        res.status(500).json({ error: 'Failed to get web3 configuration' });
+    }
+});
+
+// POST /api/admin/web3-config - 更新动态Web3配置 (管理接口)
+app.post('/api/admin/web3-config', (req, res) => {
+    const newConfig = req.body;
+    console.log(`[${new Date().toISOString()}] POST /api/admin/web3-config - Received new config:`, JSON.stringify(newConfig, null, 2));
+
+    if (!newConfig || typeof newConfig !== 'object' || Object.keys(newConfig).length === 0) {
+        console.error(`[${new Date().toISOString()}] POST /api/admin/web3-config - Error: Invalid configuration data provided.`);
+        return res.status(400).json({ error: 'Invalid configuration data provided.' });
+    }
+
+    try {
+        // 确保数据目录存在，以防万一
+        if (!fs.existsSync(DATA_DIR)) {
+            fs.mkdirSync(DATA_DIR, { recursive: true });
+            console.log(`[${new Date().toISOString()}] POST /api/admin/web3-config - Created data directory: ${DATA_DIR}`);
+        }
+        fs.writeFileSync(WEB3_CONFIG_FILE_PATH, JSON.stringify(newConfig, null, 2), 'utf8');
+        console.log(`[${new Date().toISOString()}] POST /api/admin/web3-config - Web3 live config updated successfully at ${WEB3_CONFIG_FILE_PATH}`);
+        res.status(200).json({ success: true, message: 'Web3 configuration updated successfully.' });
+    } catch (error) {
+        console.error(`[${new Date().toISOString()}] POST /api/admin/web3-config - Error updating config: ${error.message}`);
+        res.status(500).json({ error: 'Failed to update web3 configuration.' });
     }
 });
 
