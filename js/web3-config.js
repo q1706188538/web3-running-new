@@ -15,7 +15,7 @@ const Web3Config = {
 
     // 桥接合约配置
     BRIDGE_CONTRACT: {
-        ADDRESS: "0x9c3748543cB4AE1951dd61485C417e12696Ca408",  // 桥接合约地址
+        ADDRESS: "0x2244cb50Ce726ca34ae0FCD38f6ca99f2DA9f9A4",  // 桥接合约地址（新部署的合约地址）
         OWNER_ADDRESS: "0xcf0d5de2ad5be4d1721fb77b99ac738d3f2a4444",  // 合约所有者地址
         GAME_SERVER_ADDRESS: "0xE628408B47918c17cf6B97dDfa2A27c9a1CF451d",  // 游戏服务器地址
         TAX_WALLET_ADDRESS: "0x828E565E19572aE99c2aE9fa2833E72FB16F8946"  // 税收钱包地址
@@ -26,7 +26,7 @@ const Web3Config = {
         NAME: "DeSci",  // 代币名称
         SYMBOL: "DSCI",  // 代币符号
         DECIMALS: 18,  // 代币小数位数
-        ADDRESS: "0x9c3748543cB4AE1951dd61485C417e12696Ca408"  // 代币合约地址
+        ADDRESS: "0xcf0d5de2ad5be4d1721fb77b99ac738d3f2a4444"  // 代币合约地址
     },
 
     // 兑换配置
