@@ -867,9 +867,9 @@ const TokenExchange = {
 
         if (inverseMode) {
             // 反向模式: 100代币=1金币
-            // 计算获得的金币数量
+            // 计算需要的金币数量
             requiredCoins = tokenAmount / this.config.COINS_PER_TOKEN;
-            totalCoinsNeeded = 0; // 不需要支付金币
+            totalCoinsNeeded = requiredCoins; // 需要支付金币
         } else {
             // 正常模式: 1000金币=1代币
             // 计算需要的金币数量
@@ -989,12 +989,22 @@ const TokenExchange = {
             return;
         }
 
+        // 检查是否使用反向兑换模式
+        let inverseMode = false;
+        if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
+            inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
+        }
+
         // 计算需要的金币数量 - 与合约中的计算逻辑保持一致
-        // 合约中的计算:
-        // uint256 expectedGameCoins = tokenAmount * exchangeRate / (10**decimals());
-        // 不再计算金币税
-        const requiredCoins = tokenAmount * this.config.COINS_PER_TOKEN;
-        const totalCoinsNeeded = requiredCoins; // 不再有金币税
+        let requiredCoins = 0;
+        if (inverseMode) {
+            // 反向模式: 100代币=1金币
+            requiredCoins = tokenAmount / this.config.COINS_PER_TOKEN;
+        } else {
+            // 正常模式: 1000金币=1代币
+            requiredCoins = tokenAmount * this.config.COINS_PER_TOKEN;
+        }
+        const totalCoinsNeeded = requiredCoins;
 
         // 检查金币是否足够
         if (this.currentCoins < totalCoinsNeeded) {
