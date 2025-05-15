@@ -168,7 +168,7 @@ const TokenExchange = {
 
         // 创建标题
         const title = document.createElement('h2');
-        title.textContent = '兑换代币';
+        title.textContent = '代币管理';
         title.style.cssText = `
             text-align: center;
             margin-top: 0;
@@ -223,10 +223,69 @@ const TokenExchange = {
         balanceInfo.appendChild(coinsBalance);
         balanceInfo.appendChild(tokensBalance);
 
+        // 创建选项卡容器
+        const tabsContainer = document.createElement('div');
+        tabsContainer.style.cssText = `
+            display: flex;
+            justify-content: center;
+            margin: 15px 0 5px;
+            border-bottom: 1px solid #ddd;
+        `;
+
+        // 创建兑换选项卡
+        const exchangeTab = document.createElement('div');
+        exchangeTab.textContent = '兑换代币';
+        exchangeTab.className = 'token-tab active';
+        exchangeTab.style.cssText = `
+            padding: 8px 15px;
+            cursor: pointer;
+            border-bottom: 2px solid #4CAF50;
+            color: #4CAF50;
+            font-weight: bold;
+            margin: 0 5px;
+        `;
+
+        // 创建奖励池选项卡
+        const rewardPoolTab = document.createElement('div');
+        rewardPoolTab.textContent = '奖励池';
+        rewardPoolTab.className = 'token-tab';
+        rewardPoolTab.style.cssText = `
+            padding: 8px 15px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            color: #777;
+            margin: 0 5px;
+        `;
+
+        // 创建资金池选项卡
+        const fundingPoolTab = document.createElement('div');
+        fundingPoolTab.textContent = '资金池';
+        fundingPoolTab.className = 'token-tab';
+        fundingPoolTab.style.cssText = `
+            padding: 8px 15px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            color: #777;
+            margin: 0 5px;
+        `;
+
+        // 添加选项卡到容器
+        tabsContainer.appendChild(exchangeTab);
+        tabsContainer.appendChild(rewardPoolTab);
+        tabsContainer.appendChild(fundingPoolTab);
+
+        // 创建内容区域容器
+        const contentContainer = document.createElement('div');
+        contentContainer.style.cssText = `
+            margin: 15px 0;
+        `;
+
         // 创建兑换表单
-        const form = document.createElement('div');
-        form.style.cssText = `
-            margin: 20px 0;
+        const exchangeForm = document.createElement('div');
+        exchangeForm.id = 'exchange-form';
+        exchangeForm.style.cssText = `
+            margin: 0;
+            display: block;
         `;
 
         // 创建兑换比例信息
@@ -391,18 +450,172 @@ const TokenExchange = {
             display: none;
         `;
 
-        // 组装表单
-        form.appendChild(rateInfo);
-        form.appendChild(taxInfo);
-        form.appendChild(inputGroup);
-        form.appendChild(calculationResult);
-        form.appendChild(exchangeButton);
-        form.appendChild(resultMessage);
+        // 组装兑换表单
+        exchangeForm.appendChild(rateInfo);
+        exchangeForm.appendChild(taxInfo);
+        exchangeForm.appendChild(inputGroup);
+        exchangeForm.appendChild(calculationResult);
+        exchangeForm.appendChild(exchangeButton);
+        exchangeForm.appendChild(resultMessage);
+
+        // 创建奖励池内容
+        const rewardPoolContent = document.createElement('div');
+        rewardPoolContent.id = 'reward-pool-content';
+        rewardPoolContent.style.cssText = `
+            margin: 0;
+            display: none;
+            text-align: center;
+        `;
+
+        // 奖励池加载提示
+        const rewardPoolLoading = document.createElement('p');
+        rewardPoolLoading.id = 'reward-pool-loading';
+        rewardPoolLoading.textContent = '加载中...';
+        rewardPoolLoading.style.cssText = 'color: #f0ad4e;';
+
+        // 奖励池错误提示
+        const rewardPoolError = document.createElement('p');
+        rewardPoolError.id = 'reward-pool-error';
+        rewardPoolError.style.cssText = 'color: #d9534f; display: none;';
+
+        // 奖励池余额显示
+        const rewardPoolBalance = document.createElement('p');
+        rewardPoolBalance.id = 'reward-pool-balance';
+        rewardPoolBalance.style.cssText = 'font-size: 22px; color: #5cb85c; margin: 20px 0; font-weight: bold;';
+
+        // 奖励池说明
+        const rewardPoolDesc = document.createElement('p');
+        rewardPoolDesc.textContent = '奖励池中的代币来自所有交易的税收，将用于游戏激励和社区建设。';
+        rewardPoolDesc.style.cssText = 'font-size: 14px; color: #666; margin-top: 15px;';
+
+        // 组装奖励池内容
+        rewardPoolContent.appendChild(rewardPoolLoading);
+        rewardPoolContent.appendChild(rewardPoolError);
+        rewardPoolContent.appendChild(rewardPoolBalance);
+        rewardPoolContent.appendChild(rewardPoolDesc);
+
+        // 创建资金池内容
+        const fundingPoolContent = document.createElement('div');
+        fundingPoolContent.id = 'funding-pool-content';
+        fundingPoolContent.style.cssText = `
+            margin: 0;
+            display: none;
+            text-align: center;
+        `;
+
+        // 资金池加载提示
+        const fundingPoolLoading = document.createElement('p');
+        fundingPoolLoading.id = 'funding-pool-loading';
+        fundingPoolLoading.textContent = '加载中...';
+        fundingPoolLoading.style.cssText = 'color: #f0ad4e;';
+
+        // 资金池错误提示
+        const fundingPoolError = document.createElement('p');
+        fundingPoolError.id = 'funding-pool-error';
+        fundingPoolError.style.cssText = 'color: #d9534f; display: none;';
+
+        // 资金池余额显示
+        const fundingPoolBalance = document.createElement('p');
+        fundingPoolBalance.id = 'funding-pool-balance';
+        fundingPoolBalance.style.cssText = 'font-size: 22px; color: #5cb85c; margin: 20px 0; font-weight: bold;';
+
+        // 资金池说明
+        const fundingPoolDesc = document.createElement('p');
+        fundingPoolDesc.textContent = '资金池中的代币用于游戏开发和运营，确保游戏的长期可持续发展。';
+        fundingPoolDesc.style.cssText = 'font-size: 14px; color: #666; margin-top: 15px;';
+
+        // 组装资金池内容
+        fundingPoolContent.appendChild(fundingPoolLoading);
+        fundingPoolContent.appendChild(fundingPoolError);
+        fundingPoolContent.appendChild(fundingPoolBalance);
+        fundingPoolContent.appendChild(fundingPoolDesc);
+
+        // 将所有内容添加到内容容器
+        contentContainer.appendChild(exchangeForm);
+        contentContainer.appendChild(rewardPoolContent);
+        contentContainer.appendChild(fundingPoolContent);
+
+        // 添加选项卡切换事件
+        exchangeTab.addEventListener('click', () => {
+            // 更新选项卡样式
+            exchangeTab.className = 'token-tab active';
+            exchangeTab.style.borderBottom = '2px solid #4CAF50';
+            exchangeTab.style.color = '#4CAF50';
+            exchangeTab.style.fontWeight = 'bold';
+
+            rewardPoolTab.className = 'token-tab';
+            rewardPoolTab.style.borderBottom = '2px solid transparent';
+            rewardPoolTab.style.color = '#777';
+            rewardPoolTab.style.fontWeight = 'normal';
+
+            fundingPoolTab.className = 'token-tab';
+            fundingPoolTab.style.borderBottom = '2px solid transparent';
+            fundingPoolTab.style.color = '#777';
+            fundingPoolTab.style.fontWeight = 'normal';
+
+            // 显示对应内容
+            exchangeForm.style.display = 'block';
+            rewardPoolContent.style.display = 'none';
+            fundingPoolContent.style.display = 'none';
+        });
+
+        rewardPoolTab.addEventListener('click', () => {
+            // 更新选项卡样式
+            exchangeTab.className = 'token-tab';
+            exchangeTab.style.borderBottom = '2px solid transparent';
+            exchangeTab.style.color = '#777';
+            exchangeTab.style.fontWeight = 'normal';
+
+            rewardPoolTab.className = 'token-tab active';
+            rewardPoolTab.style.borderBottom = '2px solid #f0ad4e';
+            rewardPoolTab.style.color = '#f0ad4e';
+            rewardPoolTab.style.fontWeight = 'bold';
+
+            fundingPoolTab.className = 'token-tab';
+            fundingPoolTab.style.borderBottom = '2px solid transparent';
+            fundingPoolTab.style.color = '#777';
+            fundingPoolTab.style.fontWeight = 'normal';
+
+            // 显示对应内容
+            exchangeForm.style.display = 'none';
+            rewardPoolContent.style.display = 'block';
+            fundingPoolContent.style.display = 'none';
+
+            // 加载奖励池数据
+            this.loadRewardPoolBalance();
+        });
+
+        fundingPoolTab.addEventListener('click', () => {
+            // 更新选项卡样式
+            exchangeTab.className = 'token-tab';
+            exchangeTab.style.borderBottom = '2px solid transparent';
+            exchangeTab.style.color = '#777';
+            exchangeTab.style.fontWeight = 'normal';
+
+            rewardPoolTab.className = 'token-tab';
+            rewardPoolTab.style.borderBottom = '2px solid transparent';
+            rewardPoolTab.style.color = '#777';
+            rewardPoolTab.style.fontWeight = 'normal';
+
+            fundingPoolTab.className = 'token-tab active';
+            fundingPoolTab.style.borderBottom = '2px solid #5bc0de';
+            fundingPoolTab.style.color = '#5bc0de';
+            fundingPoolTab.style.fontWeight = 'bold';
+
+            // 显示对应内容
+            exchangeForm.style.display = 'none';
+            rewardPoolContent.style.display = 'none';
+            fundingPoolContent.style.display = 'block';
+
+            // 加载资金池数据
+            this.loadFundingPoolBalance();
+        });
 
         // 组装面板
         panel.appendChild(title);
         panel.appendChild(balanceInfo);
-        panel.appendChild(form);
+        panel.appendChild(tabsContainer);
+        panel.appendChild(contentContainer);
 
         // 组装容器
         container.appendChild(closeButton);
@@ -1222,5 +1435,138 @@ const TokenExchange = {
         this.updateCalculation();
 
         console.log(`最小兑换金额UI已更新: ${minAmount} ${this.config.TOKEN_NAME}`);
+    },
+
+    // 加载奖励池余额
+    loadRewardPoolBalance: async function() {
+        console.log('加载奖励池余额...');
+        const loadingElement = document.getElementById('reward-pool-loading');
+        const errorElement = document.getElementById('reward-pool-error');
+        const balanceElement = document.getElementById('reward-pool-balance');
+
+        if (loadingElement) loadingElement.style.display = 'block';
+        if (errorElement) errorElement.style.display = 'none';
+        if (balanceElement) balanceElement.textContent = '';
+
+        try {
+            if (!WalletManager || !WalletManager.web3) {
+                throw new Error('钱包管理器或Web3未初始化。');
+            }
+            if (!Web3TokenContract || !Web3TokenContract.tokenContract) {
+                // 尝试初始化Web3TokenContract
+                const initialized = await Web3TokenContract.init();
+                if (!initialized || !Web3TokenContract.tokenContract) {
+                    throw new Error('Web3TokenContract初始化失败或桥接合约实例未创建。');
+                }
+            }
+
+            const bridgeContract = Web3TokenContract.tokenContract;
+
+            // 获取税收钱包地址
+            const taxWalletAddress = await bridgeContract.methods.taxWallet().call();
+            console.log('奖励池 (税收钱包) 地址:', taxWalletAddress);
+
+            if (!taxWalletAddress || taxWalletAddress === '0x0000000000000000000000000000000000000000') {
+                throw new Error('获取到的税收钱包地址无效。');
+            }
+
+            // 获取该地址的代币余额
+            const balanceData = await Web3TokenContract.getBalance(taxWalletAddress);
+
+            if (balanceData && typeof balanceData.balanceInEther !== 'undefined') {
+                // 获取代币符号
+                let tokenSymbol = this.config.TOKEN_NAME;
+                try {
+                    const externalTokenAddr = await bridgeContract.methods.externalToken().call();
+                    const tempTokenContract = new WalletManager.web3.eth.Contract(
+                        [{ "constant": true, "inputs": [], "name": "symbol", "outputs": [{ "name": "", "type": "string" }], "type": "function" }],
+                        externalTokenAddr
+                    );
+                    tokenSymbol = await tempTokenContract.methods.symbol().call() || tokenSymbol;
+                } catch (symbolError) {
+                    console.warn('获取代币符号失败:', symbolError);
+                }
+
+                const formattedBalance = parseFloat(balanceData.balanceInEther).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+                if (balanceElement) balanceElement.textContent = `${formattedBalance} ${tokenSymbol}`;
+                if (loadingElement) loadingElement.style.display = 'none';
+            } else {
+                throw new Error('未能获取奖励池余额数据。');
+            }
+        } catch (error) {
+            console.error('加载奖励池余额失败:', error);
+            if (balanceElement) balanceElement.textContent = '';
+            if (errorElement) {
+                errorElement.textContent = `错误: ${error.message || '加载余额失败'}`;
+                errorElement.style.display = 'block';
+            }
+            if (loadingElement) loadingElement.style.display = 'none';
+        }
+    },
+
+    // 加载资金池余额
+    loadFundingPoolBalance: async function() {
+        console.log('加载资金池余额...');
+        const loadingElement = document.getElementById('funding-pool-loading');
+        const errorElement = document.getElementById('funding-pool-error');
+        const balanceElement = document.getElementById('funding-pool-balance');
+
+        if (loadingElement) loadingElement.style.display = 'block';
+        if (errorElement) errorElement.style.display = 'none';
+        if (balanceElement) balanceElement.textContent = '';
+
+        try {
+            if (!WalletManager || !WalletManager.web3) {
+                throw new Error('钱包管理器或Web3未初始化。');
+            }
+            if (!Web3TokenContract || !Web3TokenContract.tokenContract) {
+                const initialized = await Web3TokenContract.init();
+                if (!initialized || !Web3TokenContract.tokenContract) {
+                    throw new Error('Web3TokenContract初始化失败或桥接合约实例未创建。');
+                }
+            }
+
+            const bridgeContract = Web3TokenContract.tokenContract;
+
+            // 获取合约拥有者地址
+            const ownerAddress = await bridgeContract.methods.owner().call();
+            console.log('资金池 (合约拥有者) 地址:', ownerAddress);
+
+            if (!ownerAddress || ownerAddress === '0x0000000000000000000000000000000000000000') {
+                throw new Error('获取到的合约拥有者地址无效。');
+            }
+
+            // 获取该地址的代币余额
+            const balanceData = await Web3TokenContract.getBalance(ownerAddress);
+
+            if (balanceData && typeof balanceData.balanceInEther !== 'undefined') {
+                // 获取代币符号
+                let tokenSymbol = this.config.TOKEN_NAME;
+                try {
+                    const externalTokenAddr = await bridgeContract.methods.externalToken().call();
+                    const tempTokenContract = new WalletManager.web3.eth.Contract(
+                        [{ "constant": true, "inputs": [], "name": "symbol", "outputs": [{ "name": "", "type": "string" }], "type": "function" }],
+                        externalTokenAddr
+                    );
+                    tokenSymbol = await tempTokenContract.methods.symbol().call() || tokenSymbol;
+                } catch (symbolError) {
+                    console.warn('获取代币符号失败:', symbolError);
+                }
+
+                const formattedBalance = parseFloat(balanceData.balanceInEther).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+                if (balanceElement) balanceElement.textContent = `${formattedBalance} ${tokenSymbol}`;
+                if (loadingElement) loadingElement.style.display = 'none';
+            } else {
+                throw new Error('未能获取资金池余额数据。');
+            }
+        } catch (error) {
+            console.error('加载资金池余额失败:', error);
+            if (balanceElement) balanceElement.textContent = '';
+            if (errorElement) {
+                errorElement.textContent = `错误: ${error.message || '加载余额失败'}`;
+                errorElement.style.display = 'block';
+            }
+            if (loadingElement) loadingElement.style.display = 'none';
+        }
     }
 };

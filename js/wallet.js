@@ -202,29 +202,7 @@ const WalletManager = {
             }
         });
 
-        // 创建免费体验按钮 - 放在充值金币按钮下方
-        const freeTrialBtn = document.createElement('button');
-        freeTrialBtn.id = 'free-trial-btn';
-        freeTrialBtn.className = 'wallet-button';
-        freeTrialBtn.textContent = '免费体验';
-        freeTrialBtn.style.cssText = 'background-color: #3498db; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); transition: all 0.2s ease; min-width: 80px; text-align: center;';
 
-        // 添加悬停效果
-        freeTrialBtn.addEventListener('mouseover', function() {
-            this.style.backgroundColor = '#2980b9';
-            this.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.4)';
-        });
-
-        freeTrialBtn.addEventListener('mouseout', function() {
-            this.style.backgroundColor = '#3498db';
-            this.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.2)';
-        });
-
-        // 添加点击事件 - 在当前标签页跳转
-        freeTrialBtn.addEventListener('click', function() {
-            console.log('跳转到免费体验版本');
-            window.location.href = 'http://taowwww.blakcat.top/';
-        });
 
         // 组装UI
         walletInfo.appendChild(disconnectBtn);
@@ -254,45 +232,10 @@ const WalletManager = {
         });
         walletInfo.appendChild(leaderboardBtn); // 排行榜按钮
 
-        // 创建奖励池按钮
-        const rewardPoolBtn = document.createElement('button');
-        rewardPoolBtn.id = 'reward-pool-btn';
-        rewardPoolBtn.className = 'wallet-button';
-        rewardPoolBtn.textContent = '奖励池';
-        rewardPoolBtn.style.cssText = 'background-color: #e67e22; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: all 0.2s ease; min-width: 80px; text-align: center;';
-        rewardPoolBtn.addEventListener('mouseover', function() { this.style.backgroundColor = '#d35400'; this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.4)'; });
-        rewardPoolBtn.addEventListener('mouseout', function() { this.style.backgroundColor = '#e67e22'; this.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)'; });
-        rewardPoolBtn.addEventListener('click', function() {
-            if (typeof RewardPoolPanel !== 'undefined' && RewardPoolPanel.show) {
-                RewardPoolPanel.show();
-            } else {
-                console.error('RewardPoolPanel模块未加载或show方法不存在');
-                alert('奖励池功能暂时不可用');
-            }
-        });
-        walletInfo.appendChild(rewardPoolBtn);
 
-        // 创建资金池按钮
-        const fundingPoolBtn = document.createElement('button');
-        fundingPoolBtn.id = 'funding-pool-btn';
-        fundingPoolBtn.className = 'wallet-button';
-        fundingPoolBtn.textContent = '资金池';
-        fundingPoolBtn.style.cssText = 'background-color: #2ecc71; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: all 0.2s ease; min-width: 80px; text-align: center;';
-        fundingPoolBtn.addEventListener('mouseover', function() { this.style.backgroundColor = '#27ae60'; this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.4)'; });
-        fundingPoolBtn.addEventListener('mouseout', function() { this.style.backgroundColor = '#2ecc71'; this.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)'; });
-        fundingPoolBtn.addEventListener('click', function() {
-            if (typeof FundingPoolPanel !== 'undefined' && FundingPoolPanel.show) {
-                FundingPoolPanel.show();
-            } else {
-                console.error('FundingPoolPanel模块未加载或show方法不存在');
-                alert('资金池功能暂时不可用');
-            }
-        });
-        walletInfo.appendChild(fundingPoolBtn);
 
         walletInfo.appendChild(exchangeBtn);    // 兑换代币按钮
         walletInfo.appendChild(rechargeBtn);    // 充值金币按钮
-        walletInfo.appendChild(freeTrialBtn);   // 免费体验按钮
 
         walletUI.appendChild(connectBtn);
         walletUI.appendChild(walletInfo);
@@ -364,31 +307,13 @@ const WalletManager = {
 
         hint.style.cssText = 'font-size: 14px; margin-top: 20px; line-height: 1.5;';
 
-        // 创建免费体验按钮
-        const freeTrialButton = document.createElement('button');
-        freeTrialButton.textContent = '免费体验版本';
-        freeTrialButton.style.cssText = 'background-color: #3498db; color: white; border: none; padding: 12px 25px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; margin-top: 20px; transition: background-color 0.3s;';
 
-        // 鼠标悬停效果
-        freeTrialButton.onmouseover = function() {
-            this.style.backgroundColor = '#2980b9';
-        };
-        freeTrialButton.onmouseout = function() {
-            this.style.backgroundColor = '#3498db';
-        };
-
-        // 添加点击事件 - 在当前标签页跳转
-        freeTrialButton.onclick = function() {
-            console.log('从登录屏幕跳转到免费体验版本');
-            window.location.href = 'http://taowwww.blakcat.top/';
-        };
 
         // 组装登录屏幕
         loginScreen.appendChild(title);
         loginScreen.appendChild(description);
         loginScreen.appendChild(metamaskIcon);
         loginScreen.appendChild(connectButton);
-        loginScreen.appendChild(freeTrialButton);
         loginScreen.appendChild(hint);
 
         // 添加到页面

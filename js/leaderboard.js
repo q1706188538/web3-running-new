@@ -126,7 +126,10 @@ const LeaderboardPanel = {
             this.listElement.innerHTML = ''; // Clear previous entries or loading indicator
 
             if (leaderboardData && leaderboardData.length > 0) {
-                leaderboardData.forEach((entry, index) => {
+                // 只显示前10名
+                const top10Data = leaderboardData.slice(0, 10);
+
+                top10Data.forEach((entry, index) => {
                     const listItem = document.createElement('li');
                     const displayName = entry.userId.startsWith('0x') ? `${entry.userId.substring(0, 6)}...${entry.userId.substring(entry.userId.length - 4)}` : entry.userId;
 
@@ -154,8 +157,8 @@ const LeaderboardPanel = {
                     listItem.appendChild(rankSpan);
                     listItem.appendChild(userSpan);
                     listItem.appendChild(scoreSpan);
-                    
-                    if (index === leaderboardData.length - 1) {
+
+                    if (index === top10Data.length - 1) {
                         listItem.style.borderBottom = 'none';
                     }
                     this.listElement.appendChild(listItem);
