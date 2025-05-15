@@ -60,11 +60,11 @@ library ECDSA {
 }
 
 /**
- * @title GameTokenBridgeStackFixed
+ * @title GameTokenBridgeInverse
  * @dev 此合约作为外部ERC20代币与游戏金币之间的桥梁，支持税收和签名验证。
- * 此版本是自包含的，不依赖外部库，并且解决了"Stack too deep"错误。
+ * 此版本支持反向兑换比例：100个代币兑换1个金币。
  */
-contract GameTokenBridgeStackFixed {
+contract GameTokenBridgeInverse {
     // --- 合约状态变量 ---
     address private _owner;
     bool private _reentrant;
@@ -74,14 +74,17 @@ contract GameTokenBridgeStackFixed {
     string public externalTokenSymbol; // 外部ERC20代币的符号
 
     address public gameServerAddress;
-    uint256 public exchangeRate = 100; // 1个外部代币 = exchangeRate个游戏金币 (需要根据外部代币的decimals调整)
+
+    // 兑换比例相关参数
+    uint256 public exchangeRate = 1; // 1个游戏金币 = exchangeRate个外部代币 (需要根据外部代币的decimals调整)
+    bool public inverseExchangeMode = true; // 是否使用反向兑换模式 (true: 代币兑换金币, false: 金币兑换代币)
 
     uint256 public exchangeTokenTaxRate = 200; // 金币兑换代币的税率 (基点, 200 = 2%)
     uint256 public rechargeTokenTaxRate = 100; // 代币充值金币的税率 (基点, 100 = 1%)
     address public taxWallet;
 
-    uint256 public minExchangeAmount; // 最小金币兑换代币数量 (以外部代币的最小单位表示)
-    uint256 public maxExchangeAmount; // 最大金币兑换代币数量 (以外部代币的最小单位表示)
+    uint256 public minExchangeAmount; // 最小兑换金额 (以外部代币的最小单位表示)
+    uint256 public maxExchangeAmount; // 最大兑换金额 (以外部代币的最小单位表示)
 
     mapping(address => bool) public operators;
     mapping(bytes32 => bool) public usedNonces;
@@ -109,6 +112,7 @@ contract GameTokenBridgeStackFixed {
     event RechargeToGame(address indexed player, uint256 tokenAmount, uint256 gameCoins, uint256 taxAmount);
     event OperatorSet(address indexed operator, bool status);
     event ExchangeRateUpdated(uint256 newRate);
+    event InverseExchangeModeUpdated(bool newMode);
     event ExchangeTokenTaxRateUpdated(uint256 newTaxRate);
     event RechargeTokenTaxRateUpdated(uint256 newTaxRate);
     event TaxWalletUpdated(address newTaxWallet);
@@ -138,6 +142,7 @@ contract GameTokenBridgeStackFixed {
      * @param _initialExchangeRate 初始兑换比例
      * @param _initialMinExchange 最小兑换金额 (以外部代币的最小单位表示)
      * @param _initialMaxExchange 最大兑换金额 (以外部代币的最小单位表示)
+     * @param _inverseMode 是否使用反向兑换模式
      */
     constructor(
         address _externalTokenAddress,
@@ -145,7 +150,8 @@ contract GameTokenBridgeStackFixed {
         address _taxWallet,
         uint256 _initialExchangeRate,
         uint256 _initialMinExchange,
-        uint256 _initialMaxExchange
+        uint256 _initialMaxExchange,
+        bool _inverseMode
     ) {
         require(_externalTokenAddress != address(0), "GameTokenBridge: invalid external token address");
         require(_gameServerAddress != address(0), "GameTokenBridge: invalid game server address");
@@ -163,6 +169,7 @@ contract GameTokenBridgeStackFixed {
         gameServerAddress = _gameServerAddress;
         taxWallet = _taxWallet;
         exchangeRate = _initialExchangeRate;
+        inverseExchangeMode = _inverseMode;
         minExchangeAmount = _initialMinExchange;
         maxExchangeAmount = _initialMaxExchange;
 
@@ -171,6 +178,7 @@ contract GameTokenBridgeStackFixed {
         emit GameServerAddressUpdated(_gameServerAddress);
         emit TaxWalletUpdated(_taxWallet);
         emit ExchangeRateUpdated(_initialExchangeRate);
+        emit InverseExchangeModeUpdated(_inverseMode);
         emit ExchangeLimitsUpdated(_initialMinExchange, _initialMaxExchange);
         emit OperatorSet(_gameServerAddress, true);
         emit ExchangeTokenTaxRateUpdated(exchangeTokenTaxRate);
@@ -258,12 +266,25 @@ contract GameTokenBridgeStackFixed {
 
     /**
      * @dev 设置兑换比例
-     * @param _newRate 新的兑换比例 (1个外部代币 = _newRate个游戏金币)
+     * @param _newRate 新的兑换比例
+     * 如果inverseExchangeMode为true: 1个游戏金币 = _newRate个外部代币
+     * 如果inverseExchangeMode为false: 1个外部代币 = _newRate个游戏金币
      */
     function setExchangeRate(uint256 _newRate) external onlyOwner {
         require(_newRate > 0, "GameTokenBridge: exchange rate must be positive");
         exchangeRate = _newRate;
         emit ExchangeRateUpdated(_newRate);
+    }
+
+    /**
+     * @dev 设置兑换模式
+     * @param _inverseMode 是否使用反向兑换模式
+     * true: 代币兑换金币 (100代币=1金币)
+     * false: 金币兑换代币 (1000金币=1代币)
+     */
+    function setInverseExchangeMode(bool _inverseMode) external onlyOwner {
+        inverseExchangeMode = _inverseMode;
+        emit InverseExchangeModeUpdated(_inverseMode);
     }
 
     /**
@@ -437,9 +458,18 @@ contract GameTokenBridgeStackFixed {
         // 验证签名
         _verifyExchangeSignature(data.player, data.gameCoins, data.tokenAmount, nonce, signature);
 
-        // 计算预期的游戏金币
-        uint256 expectedGameCoins = data.tokenAmount * exchangeRate / (10**uint256(externalTokenDecimals));
-        require(data.gameCoins >= expectedGameCoins, "GameTokenBridge: insufficient game coins for requested token amount");
+        // 根据兑换模式计算预期的游戏金币或代币
+        if (inverseExchangeMode) {
+            // 反向模式: 100代币=1金币
+            // 计算预期的代币数量: 金币数量 * 兑换比例 * 10^decimals
+            uint256 expectedTokenAmount = data.gameCoins * exchangeRate * (10**uint256(externalTokenDecimals)) / 1e18;
+            require(data.tokenAmount >= expectedTokenAmount, "GameTokenBridge: insufficient token amount for requested game coins");
+        } else {
+            // 正常模式: 1000金币=1代币
+            // 计算预期的游戏金币: 代币数量 * 兑换比例 / 10^decimals
+            uint256 expectedGameCoins = data.tokenAmount * exchangeRate / (10**uint256(externalTokenDecimals));
+            require(data.gameCoins >= expectedGameCoins, "GameTokenBridge: insufficient game coins for requested token amount");
+        }
 
         // 检查合约所有者的代币余额和授权
         uint256 ownerBalance = externalToken.balanceOf(owner());
@@ -495,6 +525,19 @@ contract GameTokenBridgeStackFixed {
 
         // 验证签名
         _verifyRechargeSignature(data.player, data.tokenAmount, data.gameCoins, nonce, signature);
+
+        // 根据兑换模式验证游戏金币和代币的关系
+        if (inverseExchangeMode) {
+            // 反向模式: 100代币=1金币
+            // 计算预期的游戏金币: 代币数量 / 兑换比例 / 10^decimals * 1e18
+            uint256 expectedGameCoins = data.tokenAmount * 1e18 / exchangeRate / (10**uint256(externalTokenDecimals));
+            require(data.gameCoins <= expectedGameCoins, "GameTokenBridge: game coins exceed expected amount");
+        } else {
+            // 正常模式: 1000金币=1代币
+            // 计算预期的代币数量: 游戏金币 / 兑换比例 * 10^decimals
+            uint256 expectedTokenAmount = data.gameCoins * (10**uint256(externalTokenDecimals)) / exchangeRate;
+            require(data.tokenAmount >= expectedTokenAmount, "GameTokenBridge: token amount below expected amount");
+        }
 
         usedNonces[nonce] = true;
 
