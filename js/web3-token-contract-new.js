@@ -601,6 +601,13 @@ const Web3TokenContract = {
             };
         }
 
+        // 检查是否使用反向兑换模式
+        let inverseMode = false;
+        if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
+            inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
+        }
+        console.log('反向兑换模式:', inverseMode);
+
         try {
             console.log('使用签名验证兑换游戏金币为代币:');
             console.log('- 用户地址:', this.userAddress);
@@ -672,6 +679,19 @@ const Web3TokenContract = {
             try {
                 // 调用合约的exchangeFromGame函数
                 console.log('调用合约exchangeFromGame方法...');
+
+                // 检查是否使用反向兑换模式
+                let inverseMode = false;
+                if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
+                    inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
+                }
+
+                // 在反向兑换模式下，合约从合约所有者转移代币到玩家
+                // 玩家不需要支付代币，而是支付游戏金币
+                // 所以这里不需要特殊处理，直接调用合约方法即可
+                console.log('反向兑换模式:', inverseMode);
+                console.log('- 玩家将获得代币数量:', this.web3.utils.fromWei(tokenAmountInWei, 'ether'));
+                console.log('- 玩家将支付游戏金币:', gameCoinsToUse);
 
                 const tx = await this.tokenContract.methods.exchangeFromGame(
                     this.userAddress,

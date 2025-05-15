@@ -885,9 +885,11 @@ const TokenExchange = {
         // 更新计算结果
         if (inverseMode) {
             // 反向模式: 100代币=1金币
+            // 在反向模式下，玩家支付游戏金币，获得代币
+            // 代币从合约所有者转移到玩家，所以玩家不需要支付代币
             calculationElement.innerHTML = `
                 <p>需要支付: <strong>${requiredCoins.toLocaleString()}</strong> 金币</p>
-                <p>应得代币: <strong>${tokenAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
+                <p>将获得代币: <strong>${tokenAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
                 <p>代币税: <strong>${tokenTaxAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME} (${this.config.TOKEN_TAX_PERCENT}%)</p>
                 <p>实际获得: <strong>${(tokenAmount - tokenTaxAmount).toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
                 <p>税收钱包获得: <strong>${tokenTaxAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
@@ -1101,12 +1103,10 @@ const TokenExchange = {
                     // 在反向模式下，我们需要将代币数量转换为正确的wei单位
                     let adjustedTokenAmount = tokenAmount;
                     if (inverseMode) {
-                        // 根据合约中的计算逻辑调整代币数量
-                        // 合约中的计算: expectedTokenAmount = gameCoins * exchangeRate * (10**decimals) / 1e18
-                        // 我们需要确保传入的tokenAmount与此计算结果匹配
-                        const exchangeRate = this.config.COINS_PER_TOKEN;
-                        adjustedTokenAmount = gameCoinsToUse * exchangeRate;
-                        console.log('反向兑换模式 - 调整后的代币数量:', adjustedTokenAmount);
+                        // 在反向兑换模式下，合约从合约所有者转移代币到玩家
+                        // 玩家不需要支付代币，而是支付游戏金币
+                        // 所以这里不需要调整代币数量，直接使用前端计算的代币数量即可
+                        console.log('反向兑换模式 - 使用原始代币数量:', adjustedTokenAmount);
                     }
 
                     const exchangeResult = await Web3TokenContract.exchangeCoinsForTokensWithSignature(
