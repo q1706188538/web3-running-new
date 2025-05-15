@@ -315,6 +315,7 @@ const TokenExchange = {
 
         // 创建兑换比例信息
         const rateInfo = document.createElement('p');
+        rateInfo.id = 'token-exchange-rate-info';
         rateInfo.innerHTML = `兑换比例: <strong>${this.config.COINS_PER_TOKEN}</strong> 金币 = <strong>1</strong> ${this.config.TOKEN_NAME}`;
         rateInfo.style.cssText = `
             margin: 10px 0;
@@ -730,6 +731,9 @@ const TokenExchange = {
 
         // 更新代币税率UI
         this.updateTaxRateUI();
+
+        // 更新兑换比例UI
+        this.updateRateUI();
 
         // 显示兑换界面
         const container = document.getElementById('token-exchange-container');
@@ -1382,6 +1386,20 @@ const TokenExchange = {
             console.log('代币税率UI已更新');
         } else {
             console.warn('找不到代币税率UI元素');
+        }
+    },
+
+    // 更新兑换比例UI
+    updateRateUI: function() {
+        console.log('更新兑换比例UI');
+
+        // 查找兑换比例信息元素
+        const rateInfo = document.getElementById('token-exchange-rate-info');
+        if (rateInfo) {
+            rateInfo.innerHTML = `兑换比例: <strong>${this.config.COINS_PER_TOKEN}</strong> 金币 = <strong>1</strong> ${this.config.TOKEN_NAME}`;
+            console.log('兑换比例UI已更新');
+        } else {
+            console.warn('找不到兑换比例UI元素');
         }
     },
 

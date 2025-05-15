@@ -230,6 +230,7 @@ const TokenRecharge = {
 
         // 创建充值比例信息
         const rateInfo = document.createElement('p');
+        rateInfo.id = 'token-recharge-rate-info';
         rateInfo.innerHTML = `充值比例: <strong>1</strong> ${this.config.TOKEN_NAME} = <strong>${this.config.COINS_PER_TOKEN}</strong> 金币`;
         rateInfo.style.cssText = `
             margin: 10px 0;
@@ -524,6 +525,9 @@ const TokenRecharge = {
 
         // 更新金币税率UI
         this.updateFeeRateUI();
+
+        // 更新充值比例UI
+        this.updateRateUI();
 
         // 更新单位标签
         this.updateUnitLabels();
@@ -1004,6 +1008,20 @@ const TokenRecharge = {
                 console.log('充值页面单位标签已更新为"金币"');
             }
         });
+    },
+
+    // 更新充值比例UI
+    updateRateUI: function() {
+        console.log('更新充值比例UI');
+
+        // 查找充值比例信息元素
+        const rateInfo = document.getElementById('token-recharge-rate-info');
+        if (rateInfo) {
+            rateInfo.innerHTML = `充值比例: <strong>1</strong> ${this.config.TOKEN_NAME} = <strong>${this.config.COINS_PER_TOKEN}</strong> 金币`;
+            console.log('充值比例UI已更新');
+        } else {
+            console.warn('找不到充值比例UI元素');
+        }
     },
 
     // 显示/隐藏加载中状态
