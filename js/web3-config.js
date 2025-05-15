@@ -1,7 +1,7 @@
 /**
  * Web3配置
  * 用于设置与区块链交互的各种参数
- * 
+ *
  * 当需要部署新的桥接合约时，只需更新此文件中的相关参数
  */
 const Web3Config = {
@@ -12,7 +12,7 @@ const Web3Config = {
         RPC_URL: "https://data-seed-prebsc-1-s1.binance.org:8545/",
         EXPLORER_URL: "https://testnet.bscscan.com"
     },
-    
+
     // 桥接合约配置
     BRIDGE_CONTRACT: {
         ADDRESS: "0x9c3748543cB4AE1951dd61485C417e12696Ca408",  // 桥接合约地址
@@ -20,7 +20,7 @@ const Web3Config = {
         GAME_SERVER_ADDRESS: "0xE628408B47918c17cf6B97dDfa2A27c9a1CF451d",  // 游戏服务器地址
         TAX_WALLET_ADDRESS: "0x828E565E19572aE99c2aE9fa2833E72FB16F8946"  // 税收钱包地址
     },
-    
+
     // 代币配置
     TOKEN: {
         NAME: "DeSci",  // 代币名称
@@ -28,23 +28,23 @@ const Web3Config = {
         DECIMALS: 18,  // 代币小数位数
         ADDRESS: "0x9c3748543cB4AE1951dd61485C417e12696Ca408"  // 代币合约地址
     },
-    
+
     // 兑换配置
     EXCHANGE: {
-        RATE: 100,  // 兑换比例：1个代币 = 100个游戏金币
-        MIN_AMOUNT: 1,  // 最小兑换金额（代币）
-        MAX_AMOUNT: 1000,  // 最大兑换金额（代币）
+        RATE: 0.01,  // 兑换比例：20000个代币 = 200个游戏金币，即1个代币 = 0.01个游戏金币
+        MIN_AMOUNT: 1000,  // 最小兑换金额（代币）
+        MAX_AMOUNT: 1000000,  // 最大兑换金额（代币）
         TAX_RATE: 200  // 兑换税率（基点，200 = 2%）
     },
-    
+
     // 充值配置
     RECHARGE: {
-        RATE: 100,  // 充值比例：1个代币 = 100个游戏金币
-        MIN_AMOUNT: 1,  // 最小充值金额（代币）
-        MAX_AMOUNT: 1000,  // 最大充值金额（代币）
+        RATE: 0.01,  // 充值比例：20000个代币 = 200个游戏金币，即1个代币 = 0.01个游戏金币
+        MIN_AMOUNT: 1000,  // 最小充值金额（代币）
+        MAX_AMOUNT: 1000000,  // 最大充值金额（代币）
         TAX_RATE: 100  // 充值税率（基点，100 = 1%）
     },
-    
+
     /**
      * 获取当前网络的配置
      * @returns {Object} 网络配置
@@ -52,7 +52,7 @@ const Web3Config = {
     getNetwork: function() {
         return this.NETWORK;
     },
-    
+
     /**
      * 获取桥接合约配置
      * @returns {Object} 桥接合约配置
@@ -60,7 +60,7 @@ const Web3Config = {
     getBridgeContract: function() {
         return this.BRIDGE_CONTRACT;
     },
-    
+
     /**
      * 获取代币配置
      * @returns {Object} 代币配置
@@ -68,7 +68,7 @@ const Web3Config = {
     getToken: function() {
         return this.TOKEN;
     },
-    
+
     /**
      * 获取兑换配置
      * @returns {Object} 兑换配置
@@ -76,7 +76,7 @@ const Web3Config = {
     getExchange: function() {
         return this.EXCHANGE;
     },
-    
+
     /**
      * 获取充值配置
      * @returns {Object} 充值配置
@@ -84,14 +84,14 @@ const Web3Config = {
     getRecharge: function() {
         return this.RECHARGE;
     },
-    
+
     /**
      * 初始化配置
      * 可以在这里添加从服务器获取配置的逻辑
      */
     init: function() {
         console.log('初始化Web3配置...');
-        
+
         // 这里可以添加从服务器获取最新配置的逻辑
         // 例如：
         // fetch('/api/web3-config')
@@ -107,7 +107,7 @@ const Web3Config = {
         //     .catch(error => {
         //         console.error('获取Web3配置失败:', error);
         //     });
-        
+
         console.log('Web3配置初始化完成');
     }
 };
