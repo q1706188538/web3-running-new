@@ -908,11 +908,20 @@ const TokenRecharge = {
 
                     if (typeof ApiService !== 'undefined') {
                         try {
+                            // 检查是否使用反向兑换模式
+                            let inverseMode = false;
+                            if (typeof Web3Config !== 'undefined' && Web3Config.RECHARGE && Web3Config.RECHARGE.INVERSE_MODE !== undefined) {
+                                inverseMode = Web3Config.RECHARGE.INVERSE_MODE;
+                            }
+
+                            console.log('- 反向兑换模式:', inverseMode);
+
                             // 从API获取签名
                             signatureData = await ApiService.getRechargeSignature(
                                 this.walletAddress,
                                 tokenAmountToUse,
-                                gameCoinsToGain
+                                gameCoinsToGain,
+                                inverseMode  // 添加反向模式参数
                             );
 
                             if (!signatureData || !signatureData.success) {

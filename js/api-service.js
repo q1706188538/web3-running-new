@@ -654,7 +654,7 @@ const ApiService = {
 
 
     // 获取兑换签名
-    getExchangeSignature: async function(playerAddress, tokenAmount, gameCoins) {
+    getExchangeSignature: async function(playerAddress, tokenAmount, gameCoins, inverseMode = false) {
         if (!playerAddress) {
             console.error('获取兑换签名失败: 玩家地址为空');
             return { success: false, error: '玩家地址为空' };
@@ -688,6 +688,7 @@ const ApiService = {
             console.log('- 代币数量:', tokenAmount);
             console.log('- 游戏金币:', gameCoins);
             console.log('- 合约地址:', contractAddress);
+            console.log('- 反向兑换模式:', inverseMode);
 
             const url = this.buildApiUrl(`/sign-exchange`);
             console.log('API请求URL:', url);
@@ -696,7 +697,8 @@ const ApiService = {
                 playerAddress,
                 tokenAmount,
                 gameCoins,
-                contractAddress
+                contractAddress,
+                inverseMode
             }, null, 2));
 
             const response = await fetch(url, {
@@ -708,7 +710,8 @@ const ApiService = {
                     playerAddress,
                     tokenAmount,
                     gameCoins,
-                    contractAddress
+                    contractAddress,
+                    inverseMode
                 })
             });
 
@@ -763,7 +766,7 @@ const ApiService = {
     },
 
     // 获取充值签名
-    getRechargeSignature: async function(playerAddress, tokenAmount, gameCoins) {
+    getRechargeSignature: async function(playerAddress, tokenAmount, gameCoins, inverseMode = false) {
         if (!playerAddress) {
             console.error('获取充值签名失败: 玩家地址为空');
             return { success: false, error: '玩家地址为空' };
@@ -798,6 +801,7 @@ const ApiService = {
             console.log('- 代币数量:', tokenAmount);
             console.log('- 游戏金币:', gameCoins);
             console.log('- 合约地址:', contractAddress);
+            console.log('- 反向兑换模式:', inverseMode);
 
             const url = this.buildApiUrl(`/sign-recharge`);
             console.log('API请求URL:', url);
@@ -806,7 +810,8 @@ const ApiService = {
                 playerAddress,
                 tokenAmount,
                 gameCoins,
-                contractAddress
+                contractAddress,
+                inverseMode
             }, null, 2));
 
             const response = await fetch(url, {
@@ -818,7 +823,8 @@ const ApiService = {
                     playerAddress,
                     tokenAmount,
                     gameCoins,
-                    contractAddress
+                    contractAddress,
+                    inverseMode
                 })
             });
 
