@@ -5,7 +5,7 @@
 const ethers = require('ethers');
 
 // 游戏服务器私钥
-const GAME_SERVER_PRIVATE_KEY = 'e367e745d9f63a268b668e4bc2d80319acb111cdb90fb37b45b23592aa443e68';
+const GAME_SERVER_PRIVATE_KEY = '0x5c8b9227cd5065c7e3f6b73826b8b42e198c4497f6688e3085d5ab3a6d520e74';
 
 // 游戏服务器地址（从私钥派生）
 const gameServerWallet = new ethers.Wallet(GAME_SERVER_PRIVATE_KEY);

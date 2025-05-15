@@ -24,18 +24,18 @@ const Web3Config = {
 
     // 桥接合约配置
     BRIDGE_CONTRACT: {
-        ADDRESS: "0x4A9499e648D201BedaFFc9E481604E15D8447280",  // 桥接合约地址（新部署的合约地址）
-        OWNER_ADDRESS: "0xcf0d5de2ad5be4d1721fb77b99ac738d3f2a4444",  // 合约所有者地址
-        GAME_SERVER_ADDRESS: "0xE628408B47918c17cf6B97dDfa2A27c9a1CF451d",  // 游戏服务器地址
-        TAX_WALLET_ADDRESS: "0x828E565E19572aE99c2aE9fa2833E72FB16F8946"  // 税收钱包地址
+        ADDRESS: "0xf54677367e6D3511DCa4C336EfE31eaDFc0cDc1b",  // 桥接合约地址（新部署的合约地址）
+        OWNER_ADDRESS: "0x744b9acff32f9184c6f6639e6536437e975a4444",  // 合约所有者地址
+        GAME_SERVER_ADDRESS: "0xadd34cadc4f69c65fb38c1ceecec707f05865163",  // 游戏服务器地址
+        TAX_WALLET_ADDRESS: "0xedea273fbfad20943aa75d3d77646b23a63707a9"  // 税收钱包地址
     },
 
     // 代币配置
     TOKEN: {
-        NAME: "DeSci",  // 代币名称
-        SYMBOL: "DeSci",  // 代币符号
+        NAME: "Running",  // 代币名称
+        SYMBOL: "Running",  // 代币符号
         DECIMALS: 18,  // 代币小数位数
-        ADDRESS: "0xcf0d5de2ad5be4d1721fb77b99ac738d3f2a4444"  // 代币合约地址
+        ADDRESS: "0x744b9acff32f9184c6f6639e6536437e975a4444"  // 代币合约地址
     },
 
     // 兑换配置
