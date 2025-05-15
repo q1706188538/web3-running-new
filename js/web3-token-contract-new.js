@@ -52,15 +52,19 @@ const Web3TokenContract = {
             }
 
             // 加载ABI
-            if (typeof GameTokenBridgeABI !== 'undefined') {
+            if (typeof GameTokenBridgeInverseABI !== 'undefined') {
+                this.contractABI = GameTokenBridgeInverseABI;
+                console.log('已从全局变量加载合约ABI (GameTokenBridgeInverseABI)');
+            } else if (typeof GameTokenBridgeABI !== 'undefined') {
                 this.contractABI = GameTokenBridgeABI;
                 console.log('已从全局变量加载合约ABI (GameTokenBridgeABI)');
+                console.warn('推荐使用GameTokenBridgeInverseABI，请确保已加载相应的ABI文件');
             } else if (typeof TempleRunTokenWithTaxABI_Updated !== 'undefined') {
                 this.contractABI = TempleRunTokenWithTaxABI_Updated;
                 console.log('已从全局变量加载合约ABI (TempleRunTokenWithTaxABI_Updated)');
-                console.warn('推荐使用GameTokenBridgeABI，请确保已加载相应的ABI文件');
+                console.warn('推荐使用GameTokenBridgeInverseABI，请确保已加载相应的ABI文件');
             } else {
-                console.error('未找到GameTokenBridgeABI或TempleRunTokenWithTaxABI_Updated，请确保已加载相应的ABI文件');
+                console.error('未找到GameTokenBridgeInverseABI、GameTokenBridgeABI或TempleRunTokenWithTaxABI_Updated，请确保已加载相应的ABI文件');
                 return false;
             }
 
