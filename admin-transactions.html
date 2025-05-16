@@ -149,17 +149,34 @@
 <body>
     <div class="container">
         <h1>交易记录管理</h1>
-        
+
         <div class="nav-links">
             <a href="admin-config.html">返回配置管理</a>
         </div>
 
-        <div class="search-container">
-            <input type="text" id="walletAddressInput" placeholder="输入钱包地址">
-            <button id="searchButton">查询</button>
-        </div>
-
         <div id="errorMessage" class="error" style="display: none;"></div>
+
+        <div class="filter-container" style="margin-bottom: 20px;">
+            <label for="statusFilter">状态筛选:</label>
+            <select id="statusFilter" style="padding: 8px; margin-right: 10px;">
+                <option value="all">全部</option>
+                <option value="completed">已完成</option>
+                <option value="pending">处理中</option>
+                <option value="cancelled">已取消</option>
+                <option value="failed">失败</option>
+            </select>
+
+            <label for="dateFilter">日期筛选:</label>
+            <select id="dateFilter" style="padding: 8px; margin-right: 10px;">
+                <option value="all">全部</option>
+                <option value="today">今天</option>
+                <option value="yesterday">昨天</option>
+                <option value="last7days">最近7天</option>
+                <option value="last30days">最近30天</option>
+            </select>
+
+            <button id="refreshButton" style="padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">刷新数据</button>
+        </div>
 
         <div class="tab-container">
             <button class="tab-button active" data-tab="rechargeTab">充值记录</button>
@@ -174,6 +191,7 @@
                 <thead>
                     <tr>
                         <th>日期</th>
+                        <th>钱包地址</th>
                         <th>代币数量</th>
                         <th>游戏金币</th>
                         <th>状态</th>
@@ -194,6 +212,7 @@
                 <thead>
                     <tr>
                         <th>日期</th>
+                        <th>钱包地址</th>
                         <th>代币数量</th>
                         <th>游戏金币</th>
                         <th>状态</th>

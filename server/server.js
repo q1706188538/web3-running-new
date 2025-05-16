@@ -1267,6 +1267,62 @@ app.get('/api/user/:walletAddress/withdrawal-history', (req, res) => {
 });
 
 /**
+ * 获取所有用户的提现记录
+ * GET /api/admin/all-withdrawal-history
+ */
+app.get('/api/admin/all-withdrawal-history', (req, res) => {
+    try {
+        const userDataDir = path.join(__dirname, 'data', 'users');
+
+        // 确保用户数据目录存在
+        if (!fs.existsSync(userDataDir)) {
+            return res.status(200).json({ history: [] });
+        }
+
+        // 获取所有用户文件
+        const userFiles = fs.readdirSync(userDataDir).filter(file => file.endsWith('.json'));
+
+        // 收集所有用户的提现记录
+        let allWithdrawalHistory = [];
+
+        userFiles.forEach(file => {
+            try {
+                const filePath = path.join(userDataDir, file);
+                const userData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                const walletAddress = file.replace('.json', '');
+
+                // 确保exchangeHistory存在
+                userData.exchangeHistory = userData.exchangeHistory || [];
+
+                // 过滤出已完成的提现记录
+                const withdrawalHistory = userData.exchangeHistory
+                    .filter(record => record.status === 'completed' && record.coinsDeducted === true)
+                    .map(record => ({
+                        ...record,
+                        playerAddress: walletAddress // 确保每条记录都有玩家地址
+                    }));
+
+                allWithdrawalHistory = allWithdrawalHistory.concat(withdrawalHistory);
+            } catch (error) {
+                console.error(`处理用户文件 ${file} 时出错:`, error);
+                // 继续处理其他文件
+            }
+        });
+
+        // 按日期排序（最新的在前）
+        allWithdrawalHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        // 返回所有提现历史
+        res.status(200).json({
+            history: allWithdrawalHistory
+        });
+    } catch (error) {
+        console.error(`获取所有用户提现记录出错:`, error);
+        res.status(500).json({ error: '获取所有用户提现记录时出错' });
+    }
+});
+
+/**
  * 获取充值记录
  * GET /api/user/:walletAddress/recharge-history
  */
@@ -1304,6 +1360,62 @@ app.get('/api/user/:walletAddress/recharge-history', (req, res) => {
     } catch (error) {
         console.error(`获取充值记录出错: ${error.message}`);
         res.status(500).json({ error: '获取充值记录时出错' });
+    }
+});
+
+/**
+ * 获取所有用户的充值记录
+ * GET /api/admin/all-recharge-history
+ */
+app.get('/api/admin/all-recharge-history', (req, res) => {
+    try {
+        const userDataDir = path.join(__dirname, 'data', 'users');
+
+        // 确保用户数据目录存在
+        if (!fs.existsSync(userDataDir)) {
+            return res.status(200).json({ history: [] });
+        }
+
+        // 获取所有用户文件
+        const userFiles = fs.readdirSync(userDataDir).filter(file => file.endsWith('.json'));
+
+        // 收集所有用户的充值记录
+        let allRechargeHistory = [];
+
+        userFiles.forEach(file => {
+            try {
+                const filePath = path.join(userDataDir, file);
+                const userData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                const walletAddress = file.replace('.json', '');
+
+                // 确保rechargeHistory存在
+                userData.rechargeHistory = userData.rechargeHistory || [];
+
+                // 过滤出已完成的充值记录
+                const rechargeHistory = userData.rechargeHistory
+                    .filter(record => record.status === 'completed')
+                    .map(record => ({
+                        ...record,
+                        playerAddress: walletAddress // 确保每条记录都有玩家地址
+                    }));
+
+                allRechargeHistory = allRechargeHistory.concat(rechargeHistory);
+            } catch (error) {
+                console.error(`处理用户文件 ${file} 时出错:`, error);
+                // 继续处理其他文件
+            }
+        });
+
+        // 按日期排序（最新的在前）
+        allRechargeHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        // 返回所有充值历史
+        res.status(200).json({
+            history: allRechargeHistory
+        });
+    } catch (error) {
+        console.error(`获取所有用户充值记录出错:`, error);
+        res.status(500).json({ error: '获取所有用户充值记录时出错' });
     }
 });
 
