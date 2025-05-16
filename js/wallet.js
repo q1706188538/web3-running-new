@@ -2345,6 +2345,21 @@ const WalletManager = {
     onLoginSuccess: async function() {
         console.log('钱包连接成功:', this.account);
 
+        // 初始化代币合约
+        if (this.web3TokenContract && this.provider && this.account) {
+            try {
+                console.log('在 onLoginSuccess 中初始化 Web3TokenContract...');
+                // 假设 init 方法需要 provider, signer (或可为null/provider), account
+                // 暂时将 this.provider 同时作为 provider 和 signer 参数传递，具体需根据 Web3TokenContract 实现调整
+                await this.web3TokenContract.init(this.provider, this.provider, this.account);
+                console.log('Web3TokenContract 初始化成功。');
+            } catch (initError) {
+                console.error('在 onLoginSuccess 中初始化 Web3TokenContract 时出错:', initError);
+            }
+        } else {
+            console.warn('在 onLoginSuccess 中，Web3TokenContract, provider, 或 account 不可用，无法执行初始化。');
+        }
+
         // 从后端同步数据到本地，防止本地数据被篡改
         console.log('登录成功后从后端同步数据到本地...');
         try {
