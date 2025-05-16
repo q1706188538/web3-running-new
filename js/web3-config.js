@@ -501,18 +501,31 @@ window.addEventListener('DOMContentLoaded', async function() { // 修改为 asyn
         setTimeout(() => {
             // 创建刷新按钮
             const refreshButton = document.createElement('button');
-            refreshButton.textContent = '刷新配置';
-            refreshButton.style.position = 'fixed';
-            refreshButton.style.bottom = '10px';
-            refreshButton.style.right = '10px';
-            refreshButton.style.zIndex = '9999';
-            refreshButton.style.backgroundColor = '#f5a623';
+            refreshButton.textContent = '刷新网页';
+            refreshButton.className = 'wallet-button';
+            refreshButton.style.backgroundColor = '#3498db'; // 使用蓝色，与断开连接按钮的红色区分
             refreshButton.style.color = 'white';
             refreshButton.style.border = 'none';
-            refreshButton.style.borderRadius = '5px';
             refreshButton.style.padding = '8px 12px';
-            refreshButton.style.fontSize = '14px';
-            refreshButton.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+            refreshButton.style.borderRadius = '5px';
+            refreshButton.style.cursor = 'pointer';
+            refreshButton.style.fontWeight = 'bold';
+            refreshButton.style.fontSize = '12px';
+            refreshButton.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.2)';
+            refreshButton.style.minWidth = '80px';
+            refreshButton.style.textAlign = 'center';
+            refreshButton.style.transition = 'all 0.2s ease';
+
+            // 添加悬停效果
+            refreshButton.addEventListener('mouseover', function() {
+                this.style.backgroundColor = '#2980b9';
+                this.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.4)';
+            });
+
+            refreshButton.addEventListener('mouseout', function() {
+                this.style.backgroundColor = '#3498db';
+                this.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.2)';
+            });
 
             // 点击事件
             refreshButton.addEventListener('click', function() {
@@ -528,7 +541,7 @@ window.addEventListener('DOMContentLoaded', async function() { // 修改为 asyn
                 loadingNotification.style.borderRadius = '10px';
                 loadingNotification.style.zIndex = '10000';
                 loadingNotification.style.textAlign = 'center';
-                loadingNotification.innerHTML = '正在刷新配置...<br>请稍候';
+                loadingNotification.innerHTML = '正在刷新网页...<br>请稍候';
 
                 document.body.appendChild(loadingNotification);
 
@@ -538,8 +551,19 @@ window.addEventListener('DOMContentLoaded', async function() { // 修改为 asyn
                 }, 500);
             });
 
-            // 添加到页面
-            document.body.appendChild(refreshButton);
+            // 将刷新按钮添加到钱包信息区域，放在断开连接按钮上方
+            const walletInfo = document.getElementById('wallet-info');
+            const disconnectBtn = document.getElementById('disconnect-wallet');
+
+            if (walletInfo && disconnectBtn) {
+                // 将刷新按钮插入到断开连接按钮之前
+                walletInfo.insertBefore(refreshButton, disconnectBtn);
+                console.log('刷新按钮已添加到断开连接按钮上方');
+            } else {
+                // 如果找不到钱包信息区域或断开连接按钮，则添加到页面
+                document.body.appendChild(refreshButton);
+                console.log('未找到钱包信息区域或断开连接按钮，刷新按钮已添加到页面');
+            }
 
             // 监听页面获得焦点事件，自动检查配置更新
             window.addEventListener('focus', function() {
