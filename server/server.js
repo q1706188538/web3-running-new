@@ -1272,37 +1272,47 @@ app.get('/api/user/:walletAddress/withdrawal-history', (req, res) => {
  */
 app.get('/api/admin/all-withdrawal-history', (req, res) => {
     try {
-        const userDataDir = path.join(__dirname, 'data', 'users');
-
-        // 确保用户数据目录存在
-        if (!fs.existsSync(userDataDir)) {
+        // 直接从 DATA_DIR 获取所有用户文件
+        // 确保数据目录存在
+        if (!fs.existsSync(DATA_DIR)) {
             return res.status(200).json({ history: [] });
         }
 
         // 获取所有用户文件
-        const userFiles = fs.readdirSync(userDataDir).filter(file => file.endsWith('.json'));
+        const userFiles = fs.readdirSync(DATA_DIR).filter(file => file.endsWith('.json') && file !== 'web3-live-config.json');
 
         // 收集所有用户的提现记录
         let allWithdrawalHistory = [];
 
         userFiles.forEach(file => {
             try {
-                const filePath = path.join(userDataDir, file);
+                const filePath = path.join(DATA_DIR, file);
                 const userData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
                 const walletAddress = file.replace('.json', '');
 
-                // 确保exchangeHistory存在
-                userData.exchangeHistory = userData.exchangeHistory || [];
+                // 确保withdrawalHistory存在
+                userData.withdrawalHistory = userData.withdrawalHistory || [];
 
-                // 过滤出已完成的提现记录
-                const withdrawalHistory = userData.exchangeHistory
-                    .filter(record => record.status === 'completed' && record.coinsDeducted === true)
-                    .map(record => ({
-                        ...record,
-                        playerAddress: walletAddress // 确保每条记录都有玩家地址
-                    }));
+                // 获取提现记录
+                const withdrawalHistory = userData.withdrawalHistory.map(record => ({
+                    ...record,
+                    playerAddress: walletAddress // 确保每条记录都有玩家地址
+                }));
 
                 allWithdrawalHistory = allWithdrawalHistory.concat(withdrawalHistory);
+
+                // 如果没有专门的withdrawalHistory，也从exchangeHistory中获取提现记录
+                if (userData.exchangeHistory && userData.exchangeHistory.length > 0) {
+                    const exchangeWithdrawals = userData.exchangeHistory
+                        .filter(record => record.status === 'completed' && record.coinsDeducted === true)
+                        .map(record => ({
+                            ...record,
+                            playerAddress: walletAddress,
+                            fromExchangeHistory: true // 标记来源
+                        }));
+
+                    allWithdrawalHistory = allWithdrawalHistory.concat(exchangeWithdrawals);
+                }
             } catch (error) {
                 console.error(`处理用户文件 ${file} 时出错:`, error);
                 // 继续处理其他文件
@@ -1310,7 +1320,7 @@ app.get('/api/admin/all-withdrawal-history', (req, res) => {
         });
 
         // 按日期排序（最新的在前）
-        allWithdrawalHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+        allWithdrawalHistory.sort((a, b) => new Date(b.date || b.completedAt || 0) - new Date(a.date || a.completedAt || 0));
 
         // 返回所有提现历史
         res.status(200).json({
@@ -1369,35 +1379,32 @@ app.get('/api/user/:walletAddress/recharge-history', (req, res) => {
  */
 app.get('/api/admin/all-recharge-history', (req, res) => {
     try {
-        const userDataDir = path.join(__dirname, 'data', 'users');
-
-        // 确保用户数据目录存在
-        if (!fs.existsSync(userDataDir)) {
+        // 直接从 DATA_DIR 获取所有用户文件
+        // 确保数据目录存在
+        if (!fs.existsSync(DATA_DIR)) {
             return res.status(200).json({ history: [] });
         }
 
         // 获取所有用户文件
-        const userFiles = fs.readdirSync(userDataDir).filter(file => file.endsWith('.json'));
+        const userFiles = fs.readdirSync(DATA_DIR).filter(file => file.endsWith('.json') && file !== 'web3-live-config.json');
 
         // 收集所有用户的充值记录
         let allRechargeHistory = [];
 
         userFiles.forEach(file => {
             try {
-                const filePath = path.join(userDataDir, file);
+                const filePath = path.join(DATA_DIR, file);
                 const userData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
                 const walletAddress = file.replace('.json', '');
 
                 // 确保rechargeHistory存在
                 userData.rechargeHistory = userData.rechargeHistory || [];
 
-                // 过滤出已完成的充值记录
-                const rechargeHistory = userData.rechargeHistory
-                    .filter(record => record.status === 'completed')
-                    .map(record => ({
-                        ...record,
-                        playerAddress: walletAddress // 确保每条记录都有玩家地址
-                    }));
+                // 获取充值记录
+                const rechargeHistory = userData.rechargeHistory.map(record => ({
+                    ...record,
+                    playerAddress: walletAddress // 确保每条记录都有玩家地址
+                }));
 
                 allRechargeHistory = allRechargeHistory.concat(rechargeHistory);
             } catch (error) {
@@ -1407,7 +1414,7 @@ app.get('/api/admin/all-recharge-history', (req, res) => {
         });
 
         // 按日期排序（最新的在前）
-        allRechargeHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+        allRechargeHistory.sort((a, b) => new Date(b.date || b.completedAt || 0) - new Date(a.date || a.completedAt || 0));
 
         // 返回所有充值历史
         res.status(200).json({
