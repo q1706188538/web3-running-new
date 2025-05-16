@@ -1,0 +1,54 @@
+[33mcommit 7a381c2f259deaa1cb57a6507bb296a46e1c9aa1[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: q1706188538 <q1706188538@qq.com>
+Date:   Sat May 17 03:10:21 2025 +0800
+
+    修复获取所有用户交易记录的API端点，直接从data目录获取用户数据
+
+M	server/server.js
+
+[33mcommit 44c202bdb67f3767b46ae527d34d8777dc420e24[m
+Author: q1706188538 <q1706188538@qq.com>
+Date:   Sat May 17 03:07:39 2025 +0800
+
+    修改交易记录管理页面，直接显示所有用户的交易记录，添加筛选功能
+
+M	admin-transactions.html
+M	admin-transactions.js
+M	server/server.js
+
+[33mcommit 3a578ef65c91da88711ea6c7a62ac9b9ab1f07d5[m
+Author: q1706188538 <q1706188538@qq.com>
+Date:   Sat May 17 03:02:17 2025 +0800
+
+    添加交易记录管理页面，用于查看用户的充值和提现记录
+
+M	admin-config.html
+A	admin-transactions.html
+A	admin-transactions.js
+
+[33mcommit 0a826dcd0b5614939c89f2515f55cdfcdd53d986[m
+Author: q1706188538 <q1706188538@qq.com>
+Date:   Sat May 17 02:58:55 2025 +0800
+
+    添加提现记录保存功能，包括获取提现记录的API端点和前端方法
+
+M	js/api-service.js
+M	server/server.js
+
+[33mcommit ae6c6aca4946114bde27428f454e805495aa7f3f[m
+Author: q1706188538 <q1706188538@qq.com>
+Date:   Sat May 17 02:55:03 2025 +0800
+
+    上传所有修改文件，包括前端API服务、代币交换、充值功能和合约文件
+
+A	contracts/01GameTokenBridgeInverse.sol
+M	js/api-service.js
+M	js/token-exchange.js
+M	js/token-recharge.js
+M	js/wallet.js
+M	js/web3-token-contract-new.js
+M	server/data/web3-live-config.json
+M	server/node_modules/.package-lock.json
+M	server/package-lock.json
+M	server/package.json
+M	server/sign-exchange.js
