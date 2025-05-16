@@ -67,9 +67,17 @@ const Web3TokenContract = {
                     const accounts = await this.web3.eth.getAccounts();
                     if (accounts && accounts.length > 0) {
                         this.userAddress = accounts[0];
-                        console.log('检测到已连接的钱包地址:', this.userAddress);
+                        console.log('Web3TokenContract.init: 通过 getAccounts() 检测到已连接的钱包地址:', this.userAddress);
+                    } else if (this.web3 && this.web3.currentProvider && typeof this.web3.currentProvider.isMetaMask !== 'undefined' && this.web3.currentProvider.selectedAddress) {
+                        // 备用方案：针对 MetaMask DApp 环境，selectedAddress 可能更直接可用
+                        this.userAddress = this.web3.currentProvider.selectedAddress;
+                        console.log('Web3TokenContract.init: 通过 currentProvider.selectedAddress (MetaMask) 获取到钱包地址:', this.userAddress);
+                    } else if (this.web3 && this.web3.currentProvider && this.web3.currentProvider.accounts && this.web3.currentProvider.accounts.length > 0) {
+                        // 另一个备用方案：某些 provider 可能直接暴露 accounts 数组
+                        this.userAddress = this.web3.currentProvider.accounts[0];
+                        console.log('Web3TokenContract.init: 通过 currentProvider.accounts 获取到钱包地址:', this.userAddress);
                     } else {
-                        console.log('未检测到已连接的钱包，但仍然创建合约实例');
+                        console.log('Web3TokenContract.init: 未能通过 getAccounts() 或 currentProvider.selectedAddress/accounts 检测到已连接的钱包。');
                     }
                 } catch (accountError) {
                     console.warn('获取账户失败，但仍然创建合约实例:', accountError);
@@ -127,6 +135,24 @@ const Web3TokenContract = {
                             "name": "allowance",
                             "outputs": [{"name": "", "type": "uint256"}],
                             "type": "function"
+                        },
+                        {
+                            "constant": true,
+                            "inputs": [],
+                            "name": "name",
+                            "outputs": [{"name": "", "type": "string"}],
+                            "payable": false,
+                            "stateMutability": "view",
+                            "type": "function"
+                        },
+                        {
+                            "constant": true,
+                            "inputs": [],
+                            "name": "symbol",
+                            "outputs": [{"name": "", "type": "string"}],
+                            "payable": false,
+                            "stateMutability": "view",
+                            "type": "function"
                         }
                     ];
 
@@ -146,61 +172,62 @@ const Web3TokenContract = {
         }
     },
 
-    // 检查合约最小兑换金额
-    checkMinExchangeAmount: async function() {
+    // 从合约获取当前兑换模式 (inverseExchangeMode) - 已废弃，从 Web3Config 获取
+    /*
+    getInverseExchangeModeState: async function() {
         if (!this.tokenContract) {
-            console.error('检查最小兑换金额失败: 合约未初始化');
-            return false;
+            console.error('获取兑换模式失败: 合约未初始化');
+            return null; // 或者根据需要返回一个默认值或抛出错误
+        }
+        try {
+            const mode = await this.tokenContract.methods.inverseExchangeMode().call();
+            console.log('从合约获取的 inverseExchangeMode:', mode);
+            return mode; // boolean
+        } catch (error) {
+            console.error('获取 inverseExchangeMode 失败:', error);
+            return null; // 或其他错误指示
+        }
+    },
+    */
+
+    // 获取合约的兑换配置信息 - 已废弃，从 Web3Config 获取
+    /*
+    getContractExchangeConfig: async function() {
+        if (!this.tokenContract) {
+            console.error('获取合约配置失败: 合约未初始化');
+            return null;
         }
 
         try {
-            // 从合约获取最小兑换金额
             const minExchangeAmount = await this.tokenContract.methods.minExchangeAmount().call();
-            console.log('合约最小兑换金额:', this.web3.utils.fromWei(minExchangeAmount, 'ether'), '代币');
-
-            // 从合约获取最大兑换金额
             const maxExchangeAmount = await this.tokenContract.methods.maxExchangeAmount().call();
-            console.log('合约最大兑换金额:', this.web3.utils.fromWei(maxExchangeAmount, 'ether'), '代币');
+            const exchangeRate = await this.tokenContract.methods.exchangeRate().call(); // uint256: 1 token = X game coins (or vice-versa depending on interpretation)
+            const exchangeTokenTaxRate = await this.tokenContract.methods.exchangeTokenTaxRate().call(); // BPS
+            const rechargeTokenTaxRate = await this.tokenContract.methods.rechargeTokenTaxRate().call(); // BPS
+            const inverseMode = await this.tokenContract.methods.inverseExchangeMode().call(); // boolean
 
-            // 从合约获取兑换比例
-            const exchangeRate = await this.tokenContract.methods.exchangeRate().call();
-            console.log('合约兑换比例: 1代币 =', exchangeRate, '游戏金币');
-
-            // 从合约获取兑换手续费率
-            const exchangeFeeRate = await this.tokenContract.methods.exchangeFeeRate().call();
-            console.log('合约兑换手续费率:', exchangeFeeRate / 100, '%');
-
-            // 从合约获取兑换代币税率
-            let exchangeTokenTaxRate = 200; // 默认2%
-            try {
-                exchangeTokenTaxRate = await this.tokenContract.methods.exchangeTokenTaxRate().call();
-                console.log('合约兑换代币税率:', exchangeTokenTaxRate / 100, '%');
-            } catch (taxError) {
-                console.warn('获取兑换代币税率失败，使用默认值2%:', taxError);
-            }
-
-            // 从合约获取充值代币税率
-            let rechargeTokenTaxRate = 100; // 默认1%
-            try {
-                rechargeTokenTaxRate = await this.tokenContract.methods.rechargeTokenTaxRate().call();
-                console.log('合约充值代币税率:', rechargeTokenTaxRate / 100, '%');
-            } catch (taxError) {
-                console.warn('获取充值代币税率失败，使用默认值1%:', taxError);
-            }
+            console.log('合约配置获取成功:');
+            console.log('- minExchangeAmount (wei):', minExchangeAmount.toString());
+            console.log('- maxExchangeAmount (wei):', maxExchangeAmount.toString());
+            console.log('- exchangeRate (raw):', exchangeRate.toString());
+            console.log('- exchangeTokenTaxRate (BPS):', exchangeTokenTaxRate.toString());
+            console.log('- rechargeTokenTaxRate (BPS):', rechargeTokenTaxRate.toString());
+            console.log('- inverseExchangeMode:', inverseMode);
 
             return {
-                minExchangeAmount: this.web3.utils.fromWei(minExchangeAmount, 'ether'),
-                maxExchangeAmount: this.web3.utils.fromWei(maxExchangeAmount, 'ether'),
-                exchangeRate: exchangeRate,
-                exchangeFeeRate: exchangeFeeRate,
-                exchangeTokenTaxRate: exchangeTokenTaxRate,
-                rechargeTokenTaxRate: rechargeTokenTaxRate
+                minExchangeAmount: minExchangeAmount, // wei
+                maxExchangeAmount: maxExchangeAmount, // wei
+                exchangeRate: exchangeRate, // raw uint256 from contract
+                exchangeTokenTaxRateBPS: exchangeTokenTaxRate, // BPS
+                rechargeTokenTaxRateBPS: rechargeTokenTaxRate, // BPS
+                inverseMode: inverseMode // boolean
             };
         } catch (error) {
-            console.error('获取合约最小兑换金额失败:', error);
-            return false;
+            console.error('获取合约配置失败:', error);
+            return null;
         }
     },
+    */
 
     // 初始化Web3但不请求账户
     initWeb3WithoutConnect: function() {
@@ -448,11 +475,92 @@ const Web3TokenContract = {
                 console.log('从GameConfig.TOKEN_RECHARGE获取网络ID:', GameConfig.TOKEN_RECHARGE.NETWORK_ID);
                 return GameConfig.TOKEN_RECHARGE.NETWORK_ID;
             }
+} // 关闭 if (typeof GameConfig !== 'undefined')
+            // 如果都没有配置，返回默认值97（BSC测试网）
+            console.warn('未找到网络ID配置，使用默认值97（BSC测试网）');
+            return 97;
+        },
+
+// 获取外部代币的名称、符号和小数位数
+    getTokenInfo: async function() {
+        if (!this.web3) {
+            console.error("Web3TokenContract.getTokenInfo: Web3 is not initialized.");
+            return null;
+        }
+        // 确保 externalTokenContract 已初始化
+        if (!this.externalTokenContract) {
+            console.warn("Web3TokenContract.getTokenInfo: External token contract (this.externalTokenContract) is not initialized. Attempting to initialize...");
+            // 尝试按需初始化。这依赖于 this.tokenContract (桥接合约) 已经初始化
+            // 并且能够提供 externalTokenAddress。
+            // init() 方法中已经有获取 externalTokenAddress 并创建 externalTokenContract 的逻辑。
+            // 这里我们假设如果 externalTokenContract 为空，可能是 init() 未成功完成该部分，
+            // 或者 getTokenInfo 在 init() 完成前被调用。
+            // 一个更健壮的方法是确保 init() 总是成功设置它，或者使 init() 返回一个 Promise 并在其解决后再调用 getTokenInfo。
+            // 为了简单起见，如果 init() 中 externalTokenAddress 获取和实例创建的逻辑是可靠的，
+            // 那么 externalTokenContract 应该在 init() 成功后被设置。
+            // 如果仍然没有，可能是 init() 本身就有问题，或者调用时机不对。
+            // 我们在这里可以尝试再次获取地址并创建实例，但这会重复 init() 中的逻辑。
+            // 更优的做法是确保 init() 成功创建 this.externalTokenContract。
+            // 此处简化处理：如果 init() 未能创建它，则 getTokenInfo 也无法工作。
+            // 或者，可以从 this.tokenContract (桥接合约) 重新获取 externalTokenAddress 并创建。
+
+            if (this.tokenContract && typeof this.tokenContract.methods.externalToken === 'function') {
+                try {
+                    const externalTokenAddress = await this.tokenContract.methods.externalToken().call();
+                    if (externalTokenAddress && externalTokenAddress !== '0x0000000000000000000000000000000000000000') {
+                        console.log("Web3TokenContract.getTokenInfo: Lazily initializing externalTokenContract with address:", externalTokenAddress);
+                        // 使用与 init() 中相同的、已扩展的 ABI 来创建实例
+                        // 注意：这里的 tokenABI 定义是局部的，如果 init 中的 ABI 定义更新，这里也需要同步
+                        const tokenABI = [
+                            {"constant": true, "inputs": [{"name": "_owner", "type": "address"}], "name": "balanceOf", "outputs": [{"name": "balance", "type": "uint256"}], "type": "function"},
+                            {"constant": true, "inputs": [], "name": "decimals", "outputs": [{"name": "", "type": "uint8"}], "type": "function"},
+                            {"constant": false, "inputs": [{"name": "_spender", "type": "address"}, {"name": "_value", "type": "uint256"}], "name": "approve", "outputs": [{"name": "", "type": "bool"}], "type": "function"},
+                            {"constant": true, "inputs": [{"name": "_owner", "type": "address"}, {"name": "_spender", "type": "address"}], "name": "allowance", "outputs": [{"name": "", "type": "uint256"}], "type": "function"},
+                            {"constant": true, "inputs": [], "name": "name", "outputs": [{"name": "", "type": "string"}], "payable": false, "stateMutability": "view", "type": "function"},
+                            {"constant": true, "inputs": [], "name": "symbol", "outputs": [{"name": "", "type": "string"}], "payable": false, "stateMutability": "view", "type": "function"}
+                        ];
+                        this.externalTokenContract = new this.web3.eth.Contract(tokenABI, externalTokenAddress);
+                    } else {
+                        console.error("Web3TokenContract.getTokenInfo: Could not retrieve a valid external token address from bridge contract for lazy init.");
+                        return null;
+                    }
+                } catch (err) {
+                    console.error("Web3TokenContract.getTokenInfo: Error during lazy initialization of externalTokenContract:", err);
+                    return null;
+                }
+            } else {
+                 console.error("Web3TokenContract.getTokenInfo: Bridge contract (this.tokenContract) not available for lazy initialization of external token contract.");
+                 return null;
+            }
+
+            // 再次检查 externalTokenContract 是否成功创建
+            if (!this.externalTokenContract) {
+                console.error("Web3TokenContract.getTokenInfo: External token contract still not initialized after lazy attempt.");
+                return null;
+            }
         }
 
-        // 如果都没有配置，返回默认值97（BSC测试网）
-        console.warn('未找到网络ID配置，使用默认值97（BSC测试网）');
-        return 97;
+        try {
+            console.log("Web3TokenContract.getTokenInfo: Fetching info from external token contract:", this.externalTokenContract.options.address);
+            const name = await this.externalTokenContract.methods.name().call();
+            const symbol = await this.externalTokenContract.methods.symbol().call();
+            const decimalsResult = await this.externalTokenContract.methods.decimals().call();
+            const decimals = parseInt(decimalsResult, 10);
+
+            if (isNaN(decimals)) {
+                console.error(`Web3TokenContract.getTokenInfo: Decimals call returned NaN. Name: ${name}, Symbol: ${symbol}, Raw Decimals: ${decimalsResult}`);
+                return null;
+            }
+
+            console.log(`Web3TokenContract.getTokenInfo: Fetched - Name: ${name}, Symbol: ${symbol}, Decimals: ${decimals}`);
+            return { name, symbol, decimals };
+        } catch (error) {
+            console.error("Web3TokenContract.getTokenInfo: Error fetching token info from contract:", error);
+            if (this.externalTokenContract) {
+                 console.error("Details - Contract Address:", this.externalTokenContract.options.address);
+            }
+            return null;
+        }
     },
 
     // 从配置中获取RPC URL
@@ -469,37 +577,51 @@ const Web3TokenContract = {
         return 'https://data-seed-prebsc-1-s1.binance.org:8545/';
     },
 
-    // 获取代币信息
-    getTokenInfo: async function() {
+    // 获取代币信息 (旧方法，尝试从桥接合约获取，通常不正确，将被替换)
+    // getTokenInfo: async function() { ... }
+
+    // 获取外部代币的符号和小数位数 - 已废弃，从 Web3Config 获取
+    /*
+    getTokenInfoFromExternal: async function() {
         if (!this.tokenContract) {
-            console.error('获取代币信息失败: 合约未初始化');
+            console.error('Web3TokenContract.getTokenInfoFromExternal: 桥接合约未初始化');
+            return null;
+        }
+        if (!this.web3) {
+            console.error('Web3TokenContract.getTokenInfoFromExternal: Web3 未初始化');
             return null;
         }
 
         try {
-            // 获取代币名称
-            const name = await this.tokenContract.methods.name().call();
+            const externalTokenAddress = await this.tokenContract.methods.externalToken().call();
+            if (!externalTokenAddress || externalTokenAddress === '0x0000000000000000000000000000000000000000') {
+                console.error('Web3TokenContract.getTokenInfoFromExternal: 无效的外部代币地址:', externalTokenAddress);
+                return null;
+            }
 
-            // 获取代币符号
-            const symbol = await this.tokenContract.methods.symbol().call();
+            // 使用与 getBalance 中类似的简化ABI，只包含 symbol 和 decimals
+            const tokenABI = [
+                { "constant": true, "inputs": [], "name": "symbol", "outputs": [{ "name": "", "type": "string" }], "type": "function" },
+                { "constant": true, "inputs": [], "name": "decimals", "outputs": [{ "name": "", "type": "uint8" }], "type": "function" }
+            ];
 
-            // 获取代币小数位数
-            const decimals = await this.tokenContract.methods.decimals().call();
+            const extTokenContract = new this.web3.eth.Contract(tokenABI, externalTokenAddress);
 
-            // 获取代币总供应量
-            const totalSupply = await this.tokenContract.methods.totalSupply().call();
+            const symbol = await extTokenContract.methods.symbol().call();
+            const decimals = await extTokenContract.methods.decimals().call();
 
+            console.log(`Web3TokenContract.getTokenInfoFromExternal: 外部代币信息 - Symbol: ${symbol}, Decimals: ${decimals}`);
             return {
-                name: name,
                 symbol: symbol,
-                decimals: parseInt(decimals),
-                totalSupply: this.web3.utils.fromWei(totalSupply, 'ether')
+                decimals: parseInt(decimals) //确保返回整数
             };
+
         } catch (error) {
-            console.error('获取代币信息失败:', error);
+            console.error('Web3TokenContract.getTokenInfoFromExternal: 获取外部代币信息失败:', error);
             return null;
         }
     },
+    */
 
     // 获取用户代币余额
     getBalance: async function(address) {
@@ -558,24 +680,40 @@ const Web3TokenContract = {
             const balance = await externalTokenContract.methods.balanceOf(walletAddress).call();
             console.log('获取到代币余额:', balance);
 
-            // 获取代币小数位数
-            let decimals = 18; // 默认为18
-            try {
-                decimals = await externalTokenContract.methods.decimals().call();
-                console.log('获取到代币小数位数:', decimals);
-            } catch (error) {
-                console.warn('获取代币小数位数失败，使用默认值18:', error);
-            }
+            // 获取代币小数位数 - 从 Web3Config 获取
+            const configuredDecimals = (Web3Config && Web3Config.TOKEN && typeof Web3Config.TOKEN.DECIMALS !== 'undefined')
+                                ? parseInt(Web3Config.TOKEN.DECIMALS)
+                                : 18; // 如果未在 Web3Config 中配置，则默认为 18
+            console.log('Web3TokenContract.getBalance: 使用的小数位数 (来自Web3Config或默认):', configuredDecimals);
 
             // 转换为可读格式
-            const balanceInEther = this.web3.utils.fromWei(balance, 'ether');
+            let balanceFormatted;
+            try {
+                const balanceBN = this.web3.utils.toBN(balance); // 原始余额 (通常是字符串或BN对象)
+                const divisor = this.web3.utils.toBN(10).pow(this.web3.utils.toBN(configuredDecimals));
 
-            console.log(`钱包 ${walletAddress} 的代币余额:`, balanceInEther);
+                const integerPart = balanceBN.div(divisor);
+                const fractionalPart = balanceBN.mod(divisor);
+
+                if (fractionalPart.isZero()) {
+                    balanceFormatted = integerPart.toString();
+                } else {
+                    // 确保小数部分被正确填充，并移除末尾多余的零
+                    const fractionalString = fractionalPart.toString().padStart(configuredDecimals, '0').replace(/0+$/, "");
+                    // 如果移除末尾零后小数部分为空字符串 (例如，原始小数为 ".000"), 则不添加小数点和空的小数部分
+                    balanceFormatted = `${integerPart.toString()}${fractionalString.length > 0 ? "." + fractionalString : ""}`;
+                }
+            } catch (fmtError) {
+                console.error("Web3TokenContract.getBalance: 余额格式化失败:", fmtError, "将使用原始余额字符串。");
+                balanceFormatted = balance.toString(); // Fallback to raw balance string
+            }
+
+            console.log(`Web3TokenContract.getBalance: 钱包 ${walletAddress} 的代币余额: ${balanceFormatted} (原始: ${balance.toString()}, 小数: ${configuredDecimals})`);
 
             return {
-                balance: balance,
-                balanceInEther: balanceInEther,
-                decimals: parseInt(decimals)
+                balance: balance.toString(), // 确保返回的是字符串格式的原始余额
+                balanceInEther: balanceFormatted, // 使用新字段名 balanceFormatted，但为了兼容性暂时保留 balanceInEther
+                decimals: configuredDecimals
             };
         } catch (error) {
             console.error('获取代币余额失败:', error);
@@ -584,7 +722,7 @@ const Web3TokenContract = {
     },
 
     // 使用签名验证兑换游戏金币为代币
-    exchangeCoinsForTokensWithSignature: async function(tokenAmount, gameCoinsToUse, nonce, signature) {
+    exchangeCoinsForTokensWithSignature: async function(actualGameCoins, actualTokenAmount, actualNonce, actualIsInverse, actualSignature) {
         if (!this.tokenContract || !this.userAddress) {
             console.error('兑换失败: 合约未初始化或用户未连接钱包');
             return {
@@ -593,7 +731,8 @@ const Web3TokenContract = {
             };
         }
 
-        if (!tokenAmount || tokenAmount <= 0) {
+        // 使用 actualTokenAmount 进行校验
+        if (!actualTokenAmount || actualTokenAmount <= 0) {
             console.error('兑换失败: 无效的代币数量');
             return {
                 success: false,
@@ -601,34 +740,34 @@ const Web3TokenContract = {
             };
         }
 
-        // 检查是否使用反向兑换模式
-        let inverseMode = false;
-        if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
-            inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
-        }
-        console.log('反向兑换模式:', inverseMode);
+        // 使用传入的 actualIsInverse 参数进行日志记录和可能的条件判断（如果未来需要）
+        // 但最终调用 exchangeFromGame 时不会传递此参数。
+        console.log('执行 exchangeCoinsForTokensWithSignature，前端提供的 actualIsInverse:', actualIsInverse);
 
         try {
-            console.log('使用签名验证兑换游戏金币为代币:');
+            console.log('准备使用签名验证兑换游戏金币为代币:');
             console.log('- 用户地址:', this.userAddress);
-            console.log('- 代币数量:', tokenAmount);
-            console.log('- 游戏金币数量:', gameCoinsToUse);
-            console.log('- Nonce:', nonce);
-            console.log('- 签名:', signature);
+            console.log('- 代币数量 (来自参数):', actualTokenAmount);
+            console.log('- 游戏金币数量 (来自参数):', actualGameCoins);
+            console.log('- Nonce (来自参数):', actualNonce);
+            console.log('- 签名 (来自参数):', actualSignature);
             console.log('- 合约地址:', this.contractAddress);
 
-            // 将代币数量转换为wei单位
-            const tokenAmountInWei = this.web3.utils.toWei(tokenAmount.toString(), 'ether');
-            console.log('代币数量(wei):', tokenAmountInWei);
+            // 将 actualTokenAmount 转换为wei单位
+            // BUG: actualTokenAmount is already in Wei string format when passed from token-exchange.js
+            // const tokenAmountInWei = this.web3.utils.toWei(actualTokenAmount.toString(), 'ether');
+            const tokenAmountInWei = this.web3.utils.toBN(actualTokenAmount.toString()); // CORRECT: Convert Wei string to BN
+            console.log('代币数量(wei) (after toBN):', tokenAmountInWei.toString());
 
-            // 确保所有参数都有效
-            if (!this.userAddress || !gameCoinsToUse || !tokenAmountInWei || !nonce || !signature) {
+            // 确保所有参数都有效，使用新的参数名
+            if (!this.userAddress || !actualGameCoins || !tokenAmountInWei || !actualNonce || !actualSignature || typeof actualIsInverse === 'undefined') {
                 console.error('参数验证失败:');
                 console.error('- 用户地址:', this.userAddress);
-                console.error('- 游戏金币:', gameCoinsToUse);
+                console.error('- 游戏金币:', actualGameCoins);
                 console.error('- 代币数量(wei):', tokenAmountInWei);
-                console.error('- Nonce:', nonce);
-                console.error('- 签名:', signature);
+                console.error('- Nonce:', actualNonce);
+                console.error('- IsInverse:', actualIsInverse);
+                console.error('- 签名:', actualSignature);
                 return {
                     success: false,
                     error: '参数验证失败，请确保所有参数都有效'
@@ -636,40 +775,43 @@ const Web3TokenContract = {
             }
 
             // 检查签名长度
-            if (signature.length !== 132) {
-                console.error('签名长度不正确:', signature.length);
-                console.error('签名应该是132个字符（包括0x前缀）');
+            // 检查签名长度，使用 actualSignature
+            if (!actualSignature || typeof actualSignature !== 'string' || actualSignature.length !== 132) {
+                console.error('签名长度不正确:', actualSignature ? actualSignature.length : typeof actualSignature);
+                console.error('签名应该是132个字符的字符串（包括0x前缀）');
                 return {
                     success: false,
                     error: '签名格式不正确，请刷新页面后重试'
                 };
             }
 
-            // 打印完整的调用信息
-            console.log('完整的合约调用信息:');
-            console.log('- 函数名: exchangeFromGame');
-            console.log('- 参数1 (player):', this.userAddress);
-            console.log('- 参数2 (gameCoins):', gameCoinsToUse);
-            console.log('- 参数3 (tokenAmount):', tokenAmountInWei);
-            console.log('- 参数4 (nonce):', nonce);
-            console.log('- 参数5 (signature):', signature);
+            // 打印完整的调用信息，使用正确的参数名
+            // 合约 exchangeFromGame(_gameCoins, _tokenAmount, _nonce, _isInverse, _signature)
+            // msg.sender 会是 player
+            console.log('完整的合约调用信息 (准备传递给 exchangeFromGame):');
+            console.log('- _gameCoins:', actualGameCoins);
+            console.log('- _tokenAmount (wei):', tokenAmountInWei);
+            console.log('- _nonce:', actualNonce);
+            console.log('- _isInverse:', actualIsInverse);
+            console.log('- _signature:', actualSignature);
 
             // 打印参数的十六进制表示
             console.log('参数的十六进制表示:');
-            console.log('- player (hex):', this.web3.utils.toHex(this.userAddress));
-            console.log('- gameCoins (hex):', this.web3.utils.toHex(gameCoinsToUse));
-            console.log('- tokenAmount (hex):', this.web3.utils.toHex(tokenAmountInWei));
-            console.log('- nonce (hex):', nonce);
-            console.log('- signature (hex):', signature);
+            console.log('- actualGameCoins (hex):', this.web3.utils.toHex(actualGameCoins));
+            console.log('- tokenAmountInWei (hex):', this.web3.utils.toHex(tokenAmountInWei));
+            console.log('- actualNonce (hex):', actualNonce); // Nonce is already hex
+            console.log('- actualIsInverse (bool):', actualIsInverse);
+            // actualSignature is already hex, no need to toHex
 
-            // 打印ABI编码
+            // 打印ABI编码 - 确保参数顺序和数量与合约方法一致
             try {
+                // 合约 exchangeFromGame(address player, uint256 gameCoins, uint256 tokenAmount, bytes32 nonce, bytes memory signature)
                 const encodedABI = this.tokenContract.methods.exchangeFromGame(
-                    this.userAddress,
-                    gameCoinsToUse,
-                    tokenAmountInWei,
-                    nonce,
-                    signature
+                    this.userAddress,            // player (address)
+                    actualGameCoins.toString(), // gameCoins (uint256)
+                    tokenAmountInWei,           // tokenAmount (uint256)
+                    actualNonce,                // nonce (bytes32)
+                    actualSignature             // signature (bytes)
                 ).encodeABI();
                 console.log('完整的ABI编码:', encodedABI);
             } catch (e) {
@@ -678,30 +820,30 @@ const Web3TokenContract = {
 
             try {
                 // 调用合约的exchangeFromGame函数
-                console.log('调用合约exchangeFromGame方法...');
+                console.log('调用合约 exchangeFromGame 方法...');
+                console.log('注意: actualIsInverse (值为:', actualIsInverse, ') 不会直接传递给 exchangeFromGame 合约方法.');
+                console.log('传递给 exchangeFromGame 的参数:');
+                console.log('- player (this.userAddress):', this.userAddress);
+                console.log('- gameCoins (actualGameCoins):', actualGameCoins.toString());
+                console.log('- tokenAmount (tokenAmountInWei):', tokenAmountInWei);
+                console.log('- nonce (actualNonce):', actualNonce);
+                console.log('- signature (actualSignature):', actualSignature);
+                // console.log('- 玩家将获得代币数量 (actualTokenAmount):', actualTokenAmount); // This is pre-wei conversion
+                console.log('- 玩家将支付游戏金币 (actualGameCoins):', actualGameCoins);
+                console.log('- Nonce (actualNonce):', actualNonce);
+                console.log('- 签名 (actualSignature):', actualSignature);
 
-                // 检查是否使用反向兑换模式
-                let inverseMode = false;
-                if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
-                    inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
-                }
 
-                // 在反向兑换模式下，合约从合约所有者转移代币到玩家
-                // 玩家不需要支付代币，而是支付游戏金币
-                // 所以这里不需要特殊处理，直接调用合约方法即可
-                console.log('反向兑换模式:', inverseMode);
-                console.log('- 玩家将获得代币数量:', this.web3.utils.fromWei(tokenAmountInWei, 'ether'));
-                console.log('- 玩家将支付游戏金币:', gameCoinsToUse);
-
+                // 合约 exchangeFromGame(address player, uint256 gameCoins, uint256 tokenAmount, bytes32 nonce, bytes memory signature)
                 const tx = await this.tokenContract.methods.exchangeFromGame(
-                    this.userAddress,
-                    gameCoinsToUse,
-                    tokenAmountInWei,
-                    nonce,
-                    signature
+                    this.userAddress,            // player
+                    actualGameCoins.toString(), // gameCoins
+                    tokenAmountInWei,           // tokenAmount
+                    actualNonce,                // nonce
+                    actualSignature             // signature
                 ).send({
                     from: this.userAddress,
-                    gas: 300000 // 设置适当的gas限制
+                    gas: Web3Config.defaultGasLimit || 300000 // 设置适当的gas限制
                 });
 
                 console.log('兑换交易已提交:', tx);
@@ -709,7 +851,7 @@ const Web3TokenContract = {
                 return {
                     success: true,
                     data: tx,
-                    message: `成功兑换 ${tokenAmount} 个代币`
+                    message: `成功兑换 ${actualTokenAmount} 个代币` // 使用 actualTokenAmount
                 };
             } catch (error) {
                 console.error('合约方法调用失败:', error);
@@ -718,26 +860,35 @@ const Web3TokenContract = {
                 let errorMessage = '兑换失败，请稍后重试';
 
                 // 解析错误消息
-                if (error.message.includes('user rejected transaction')) {
+                if (error.message && error.message.includes('user rejected transaction')) {
                     errorMessage = '用户取消了交易';
-                } else if (error.message.includes('insufficient funds')) {
+                } else if (error.message && error.message.includes('insufficient funds')) {
                     errorMessage = 'Gas费用不足，请确保您的钱包中有足够的BNB';
-                } else if (error.message.includes('execution reverted')) {
+                } else if (error.message && error.message.includes('execution reverted')) {
                     // 尝试提取合约错误消息
-                    const revertReason = error.message.match(/reason string: '(.+?)'/);
-                    if (revertReason && revertReason[1]) {
-                        errorMessage = `合约执行失败: ${revertReason[1]}`;
+                    const revertReasonMatch = error.message.match(/reason: string '([^']*)'/); // 更通用的匹配
+                    if (revertReasonMatch && revertReasonMatch[1]) {
+                        errorMessage = `合约执行失败: ${revertReasonMatch[1]}`;
+                    } else {
+                         const revertReasonMatch2 = error.message.match(/revert (.+)/);
+                         if (revertReasonMatch2 && revertReasonMatch2[1]) {
+                            errorMessage = `合约执行失败: ${revertReasonMatch2[1]}`;
+                         } else if (error.data && error.data.message) { // MetaMask 移动端可能将 revert reason 放在 error.data.message
+                            errorMessage = `合约执行失败: ${error.data.message}`;
+                         }
                     }
                 }
 
-                // 输出更多签名调试信息
-                console.error('签名验证失败，详细信息:');
-                console.error('- 用户地址:', this.userAddress);
-                console.error('- 游戏金币:', gameCoinsToUse);
-                console.error('- 代币数量(wei):', tokenAmountInWei);
-                console.error('- Nonce:', nonce);
-                console.error('- 签名:', signature);
-                console.error('- 签名长度:', signature.length);
+
+                // 输出更多签名调试信息，使用正确的参数名
+                console.error('合约调用失败时的参数状态:');
+                console.error('- 用户地址 (msg.sender):', this.userAddress);
+                console.error('- 游戏金币 (actualGameCoins):', actualGameCoins);
+                console.error('- 代币数量(wei) (tokenAmountInWei):', tokenAmountInWei);
+                console.error('- Nonce (actualNonce):', actualNonce);
+                console.error('- IsInverse (actualIsInverse):', actualIsInverse);
+                console.error('- 签名 (actualSignature):', actualSignature);
+                console.error('- 签名长度:', actualSignature ? actualSignature.length : 'undefined');
                 console.error('- 合约地址:', this.contractAddress);
 
                 // 尝试重新计算消息哈希和签名验证
@@ -749,9 +900,9 @@ const Web3TokenContract = {
                     // 打印十六进制表示
                     console.error('参数的十六进制表示:');
                     console.error('- player (hex):', this.web3.utils.toHex(this.userAddress));
-                    console.error('- gameCoins (hex):', this.web3.utils.toHex(gameCoinsToUse));
+                    console.error('- gameCoins (hex):', this.web3.utils.toHex(actualGameCoins)); // 使用 actualGameCoins
                     console.error('- tokenAmount (hex):', this.web3.utils.toHex(tokenAmountInWei));
-                    console.error('- nonce (hex):', nonce);
+                    console.error('- nonce (hex):', actualNonce); // 使用 actualNonce
                     console.error('- contractAddress (hex):', this.web3.utils.toHex(this.contractAddress));
 
                     // 尝试使用web3.js验证签名
@@ -941,8 +1092,8 @@ const Web3TokenContract = {
             // 打印ABI编码
             try {
                 const encodedABI = this.tokenContract.methods.rechargeToGame(
-                    gameCoinsToGain,
-                    tokenAmountInWei,
+                    gameCoinsToGain,   // 正确顺序: gameCoins first
+                    tokenAmountInWei,  // 正确顺序: tokenAmount second
                     nonce,
                     signature
                 ).encodeABI();
@@ -952,12 +1103,59 @@ const Web3TokenContract = {
             }
 
             try {
+                // 获取合约的 inverseExchangeMode 值
+                let inverseMode;
+                try {
+                    inverseMode = await this.tokenContract.methods.inverseExchangeMode().call();
+                    console.log('合约的 inverseExchangeMode 值:', inverseMode);
+
+                    // 打印签名生成时使用的 isInverse 值
+                    console.log('签名生成时使用的 isInverse 值:', Web3Config.RECHARGE.INVERSE_MODE);
+
+                    // 如果不一致，打印警告
+                    if (inverseMode.toString() !== Web3Config.RECHARGE.INVERSE_MODE.toString()) {
+                        console.warn('警告: 合约的 inverseExchangeMode 值与签名生成时使用的 isInverse 值不一致!');
+                        console.warn('请确保服务器端使用的 isInverse 值与合约中的 inverseExchangeMode 值一致!');
+
+                        // 更新 Web3Config 中的 INVERSE_MODE 值
+                        console.log('更新 Web3Config.RECHARGE.INVERSE_MODE 值为:', inverseMode);
+                        Web3Config.RECHARGE.INVERSE_MODE = (inverseMode === 'true' || inverseMode === true);
+                    }
+                } catch (error) {
+                    console.error('获取合约 inverseExchangeMode 值失败:', error);
+                    // 如果获取失败，使用配置中的值
+                    inverseMode = Web3Config.RECHARGE.INVERSE_MODE;
+                }
+
                 // 调用合约的rechargeToGame函数
                 console.log('调用合约rechargeToGame方法...');
+                console.log('合约地址:', this.contractAddress);
+                console.log('合约方法参数:');
+                console.log('- tokenAmount (wei):', tokenAmountInWei.toString());
+                console.log('- gameCoins:', gameCoinsToGain);
+                console.log('- nonce:', nonce);
+                console.log('- signature:', signature);
+                console.log('- from:', this.userAddress);
+
+                // 尝试获取合约的 gameServerAddress
+                try {
+                    const gameServerAddressFromContract = await this.tokenContract.methods.gameServerAddress().call();
+                    console.log('合约中的 gameServerAddress:', gameServerAddressFromContract);
+
+                    if (gameServerAddressFromContract.toLowerCase() !== this.getGameServerAddressFromConfig().toLowerCase()) {
+                        console.warn('警告: 合约中的 gameServerAddress 与配置中的不一致!');
+                    }
+                } catch (error) {
+                    console.error('获取合约 gameServerAddress 失败:', error);
+                }
+
+                // 注意：我们不能直接检查nonce是否已被使用，因为合约可能没有公开的usedNonces方法
+                // 但我们可以通过交易失败的错误信息来判断
+                console.log('无法直接检查Nonce是否已被使用，将在交易失败时通过错误信息判断');
 
                 const tx = await this.tokenContract.methods.rechargeToGame(
-                    gameCoinsToGain,
-                    tokenAmountInWei,
+                    gameCoinsToGain,   // 正确顺序: gameCoins first
+                    tokenAmountInWei,  // 正确顺序: tokenAmount second
                     nonce,
                     signature
                 ).send({
@@ -1017,6 +1215,80 @@ const Web3TokenContract = {
 
                     // 尝试使用web3.js验证签名
                     console.error('尝试在前端验证签名...');
+
+                    // 获取合约的 inverseExchangeMode 值
+                    try {
+                        const inverseMode = await this.tokenContract.methods.inverseExchangeMode().call();
+                        console.error('合约的 inverseExchangeMode 值:', inverseMode);
+
+                        // 使用 web3.js 重新创建消息哈希，确保与合约中的方式完全一致
+                        // 合约中的代码是:
+                        // bytes32 messageHash = keccak256(abi.encodePacked(player, tokenAmount, gameCoins, nonce, address(this), "recharge"));
+
+                        // 使用 encodePacked 方式打包数据
+                        console.log('使用 encodePacked 方式打包数据:');
+                        console.log('- player:', this.userAddress);
+                        console.log('- tokenAmount:', tokenAmountInWei.toString());
+                        console.log('- gameCoins:', gameCoinsToGain.toString());
+                        console.log('- nonce:', nonce);
+                        console.log('- contractAddress:', this.contractAddress);
+                        console.log('- "recharge"');
+
+                        // 使用 soliditySha3 模拟 keccak256(abi.encodePacked(...))
+                        const packedData = this.web3.utils.soliditySha3(
+                            {type: 'address', value: this.userAddress},
+                            {type: 'uint256', value: tokenAmountInWei.toString()},
+                            {type: 'uint256', value: gameCoinsToGain.toString()},
+                            {type: 'bytes32', value: nonce},
+                            {type: 'address', value: this.contractAddress},
+                            {type: 'string', value: 'recharge'}
+                        );
+
+                        console.error('前端重新计算的消息哈希:', packedData);
+
+                        // 尝试使用 web3.js 恢复签名者地址
+                        // 方法1: 使用 soliditySha3 + recover
+                        const prefixedHash = this.web3.utils.soliditySha3(
+                            {type: 'string', value: '\x19Ethereum Signed Message:\n32'},
+                            {type: 'bytes32', value: packedData}
+                        );
+
+                        console.error('前端计算的前缀哈希:', prefixedHash);
+
+                        // 尝试恢复签名者地址
+                        try {
+                            const recoveredAddress = this.web3.eth.accounts.recover(prefixedHash, signature);
+                            console.error('方法1 - 前端恢复的签名者地址:', recoveredAddress);
+                            console.error('期望的游戏服务器地址:', gameServerAddress);
+
+                            if (recoveredAddress.toLowerCase() === gameServerAddress.toLowerCase()) {
+                                console.error('方法1 - 前端验证签名成功!');
+                            } else {
+                                console.error('方法1 - 前端验证签名失败!');
+                            }
+                        } catch (recoverError) {
+                            console.error('方法1 - 恢复签名者地址失败:', recoverError);
+                        }
+
+                        // 方法2: 直接使用 recover
+                        try {
+                            const recoveredAddress2 = this.web3.eth.accounts.recover(packedData, signature);
+                            console.error('方法2 - 前端恢复的签名者地址:', recoveredAddress2);
+
+                            if (recoveredAddress2.toLowerCase() === gameServerAddress.toLowerCase()) {
+                                console.error('方法2 - 前端验证签名成功!');
+                            } else {
+                                console.error('方法2 - 前端验证签名失败!');
+                            }
+                        } catch (recoverError) {
+                            console.error('方法2 - 恢复签名者地址失败:', recoverError);
+                        }
+
+                        // 方法3已移除，因为它总是失败
+                        // 这是因为签名格式不兼容这种恢复方式
+                    } catch (verifyError) {
+                        console.error('前端验证签名时出错:', verifyError);
+                    }
 
                     // 打印完整的错误对象
                     console.error('完整的错误对象:', JSON.stringify(error, null, 2));
@@ -1117,47 +1389,8 @@ const Web3TokenContract = {
             console.error('授权代币失败:', error);
             return { success: false, error: error.message };
         }
-    },
-
-    // 获取代币税率
-    getTokenTaxRates: async function() {
-        if (!this.tokenContract) {
-            console.error('获取代币税率失败: 合约未初始化');
-            return {
-                exchangeTokenTaxRate: 200, // 默认2%
-                rechargeTokenTaxRate: 100  // 默认1%
-            };
-        }
-
-        try {
-            // 从合约获取兑换代币税率
-            let exchangeTokenTaxRate = 200; // 默认2%
-            try {
-                exchangeTokenTaxRate = await this.tokenContract.methods.exchangeTokenTaxRate().call();
-                console.log('合约兑换代币税率:', exchangeTokenTaxRate / 100, '%');
-            } catch (taxError) {
-                console.warn('获取兑换代币税率失败，使用默认值2%:', taxError);
-            }
-
-            // 从合约获取充值代币税率
-            let rechargeTokenTaxRate = 100; // 默认1%
-            try {
-                rechargeTokenTaxRate = await this.tokenContract.methods.rechargeTokenTaxRate().call();
-                console.log('合约充值代币税率:', rechargeTokenTaxRate / 100, '%');
-            } catch (taxError) {
-                console.warn('获取充值代币税率失败，使用默认值1%:', taxError);
-            }
-
-            return {
-                exchangeTokenTaxRate: exchangeTokenTaxRate,
-                rechargeTokenTaxRate: rechargeTokenTaxRate
-            };
-        } catch (error) {
-            console.error('获取代币税率失败:', error);
-            return {
-                exchangeTokenTaxRate: 200, // 默认2%
-                rechargeTokenTaxRate: 100  // 默认1%
-            };
-        }
     }
+
+    // 旧的 getTokenTaxRates 方法已被合并到 getContractExchangeConfig，可以移除
+    // getTokenTaxRates: async function() { ... }
 };

@@ -947,13 +947,23 @@ if (typeof window.ApiService === 'undefined') {
     }, // 添加逗号，因为它不再是最后一个方法
 
     // 获取代币充值签名
-    getRechargeSignature: async function(playerAddress, tokenAmount, gameCoins, contractAddress) {
+    getRechargeSignature: async function(playerAddress, tokenAmount, gameCoins, contractAddress, isInverse) {
         if (!playerAddress || typeof tokenAmount === 'undefined' || typeof gameCoins === 'undefined' || !contractAddress) {
             console.error('获取充值签名失败: 缺少必要参数');
             return { success: false, error: '获取充值签名失败: 缺少必要参数' };
         }
 
-        console.log('ApiService: 请求充值签名，参数:', { playerAddress, tokenAmount, gameCoins, contractAddress });
+        // 如果未提供 isInverse 参数，尝试从 Web3Config 获取
+        if (typeof isInverse === 'undefined' && typeof Web3Config !== 'undefined' && Web3Config.RECHARGE) {
+            isInverse = Web3Config.RECHARGE.INVERSE_MODE;
+            console.log('从 Web3Config 获取 isInverse 值:', isInverse);
+        } else if (typeof isInverse === 'undefined') {
+            // 如果 Web3Config 不可用，默认使用 true
+            isInverse = true;
+            console.log('使用默认的 isInverse 值:', isInverse);
+        }
+
+        console.log('ApiService: 请求充值签名，参数:', { playerAddress, tokenAmount, gameCoins, contractAddress, isInverse });
 
         try {
             const url = this.buildApiUrl('/sign-recharge');
@@ -966,7 +976,8 @@ if (typeof window.ApiService === 'undefined') {
                     playerAddress,
                     tokenAmount,
                     gameCoins,
-                    contractAddress
+                    contractAddress,
+                    isInverse
                 })
             });
 
@@ -1023,7 +1034,48 @@ if (typeof window.ApiService === 'undefined') {
             console.error('ApiService: 确认充值出错:', error);
             return { success: false, error: error.message || '确认充值时发生客户端错误' };
         }
-    }, // 添加逗号，因为它不再是最后一个方法
+    },
+
+    // 确认代币兑换 (通知服务器)
+    confirmExchangeOnServer: async function(playerAddress, tokenAmount, gameCoins, nonce, txHash, isInverse) {
+        if (!playerAddress || typeof tokenAmount === 'undefined' || typeof gameCoins === 'undefined' || !nonce || !txHash || typeof isInverse === 'undefined') {
+            console.error('确认兑换失败: 缺少必要参数', { playerAddress, tokenAmount, gameCoins, nonce, txHash, isInverse });
+            return { success: false, error: '确认兑换失败: 缺少必要参数' };
+        }
+
+        console.log('ApiService: 请求确认兑换，参数:', { playerAddress, tokenAmount, gameCoins, nonce, txHash, isInverse });
+
+        try {
+            const url = this.buildApiUrl('/confirm-exchange');
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    playerAddress,
+                    tokenAmount,
+                    gameCoins,
+                    nonce,
+                    txHash,
+                    isInverse
+                })
+            });
+
+            const responseData = await response.json();
+
+            if (!response.ok) {
+                console.error('确认兑换API响应错误:', responseData);
+                throw new Error(responseData.error || `确认兑换失败: ${response.status}`);
+            }
+
+            console.log('ApiService: 确认兑换成功:', responseData);
+            return responseData; // 期望包含 { success: true, message, coinsRefunded, failureReason }
+        } catch (error) {
+            console.error('ApiService: 确认兑换出错:', error);
+            return { success: false, error: error.message || '确认兑换时发生客户端错误' };
+        }
+    },
 
     // 取消兑换 (通知服务器)
     cancelExchange: async function(playerAddress, tokenAmount, gameCoins, nonce, reason = '用户取消或交易失败') {

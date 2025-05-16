@@ -2346,18 +2346,101 @@ const WalletManager = {
         console.log('钱包连接成功:', this.account);
 
         // 初始化代币合约
-        if (this.web3TokenContract && this.provider && this.account) {
+        // 确保 web3TokenContract 实例存在，如果不存在则尝试创建
+        if (!this.web3TokenContract && typeof Web3TokenContract !== 'undefined') {
+            this.web3TokenContract = Object.create(Web3TokenContract);
+            console.log('WalletManager.onLoginSuccess: Web3TokenContract 实例已创建（按需）。');
+        }
+
+        if (this.web3TokenContract) {
+            console.log('WalletManager.onLoginSuccess: 准备初始化 Web3TokenContract...');
             try {
-                console.log('在 onLoginSuccess 中初始化 Web3TokenContract...');
-                // 假设 init 方法需要 provider, signer (或可为null/provider), account
-                // 暂时将 this.provider 同时作为 provider 和 signer 参数传递，具体需根据 Web3TokenContract 实现调整
-                await this.web3TokenContract.init(this.provider, this.provider, this.account);
-                console.log('Web3TokenContract 初始化成功。');
+                // 确保 provider 和 account 是最新的
+                if (!this.provider) {
+                    console.log('WalletManager.onLoginSuccess: this.provider 未定义，尝试重新获取...');
+                    this.provider = await this.getWalletProvider();
+                }
+                if (!this.account && this.provider && typeof this.provider.request === 'function') {
+                    console.log('WalletManager.onLoginSuccess: this.account 未定义，尝试从 provider 获取...');
+                    const accounts = await this.provider.request({ method: 'eth_accounts' });
+                    if (accounts && accounts.length > 0) {
+                        this.account = accounts[0];
+                        console.log('WalletManager.onLoginSuccess: 从 provider 获取到账户:', this.account);
+                    } else {
+                         console.warn('WalletManager.onLoginSuccess: 从 provider 未能获取到账户。');
+                    }
+                }
+                 if (!this.account && window.ethereum && window.ethereum.selectedAddress) { // 备用方案
+                    this.account = window.ethereum.selectedAddress;
+                    console.log('WalletManager.onLoginSuccess: 从 window.ethereum.selectedAddress 获取到账户:', this.account);
+                }
+
+
+                // 优先从 this.config 获取合约地址，然后回退到 Web3Config
+                const contractAddress = (this.config && this.config.TOKEN_CONTRACT_ADDRESS) ||
+                                    (typeof Web3Config !== 'undefined' && Web3Config.BRIDGE_CONTRACT ? Web3Config.BRIDGE_CONTRACT.ADDRESS : null);
+
+                if (!contractAddress) {
+                    console.error('WalletManager.onLoginSuccess: 无法获取 TOKEN_CONTRACT_ADDRESS，无法初始化 Web3TokenContract。');
+                    // throw new Error('无法获取合约地址，无法初始化 Web3TokenContract'); // 决定不中断流程
+                } else {
+                    console.log('WalletManager.onLoginSuccess: 使用合约地址初始化 Web3TokenContract:', contractAddress);
+                    const contractInitialized = await this.web3TokenContract.init(contractAddress);
+
+                    if (contractInitialized) {
+                        console.log('WalletManager.onLoginSuccess: Web3TokenContract 初始化成功。');
+                        console.log('WalletManager.onLoginSuccess: Web3TokenContract.userAddress after init:', this.web3TokenContract.userAddress);
+                        console.log('WalletManager.onLoginSuccess: Web3TokenContract.web3 after init:', !!this.web3TokenContract.web3);
+
+                        // 容错：如果 Web3TokenContract 内部未能正确设置 userAddress 或 web3，尝试从 WalletManager 补充
+                        if (!this.web3TokenContract.userAddress && this.account) {
+                            console.warn('WalletManager.onLoginSuccess: Web3TokenContract.userAddress 未通过内部init设置，尝试从 WalletManager.account 手动设置。');
+                            this.web3TokenContract.userAddress = this.account;
+                        }
+                        
+                        if (!this.web3 && this.provider) { // 确保 WalletManager 的 web3 实例存在
+                            this.web3 = new Web3(this.provider);
+                            console.log('WalletManager.onLoginSuccess: WalletManager.web3 实例已创建。');
+                        }
+
+                        if (!this.web3TokenContract.web3 && this.web3) {
+                             console.warn('WalletManager.onLoginSuccess: Web3TokenContract.web3 未通过内部init设置，尝试从 WalletManager.web3 手动设置。');
+                             this.web3TokenContract.web3 = this.web3;
+                             if (this.web3TokenContract.contractABI && this.web3TokenContract.contractAddress && this.web3TokenContract.web3) {
+                                console.log('WalletManager.onLoginSuccess: 尝试基于手动设置的 web3 重新创建 Web3TokenContract.tokenContract。');
+                                this.web3TokenContract.tokenContract = new this.web3TokenContract.web3.eth.Contract(
+                                    this.web3TokenContract.contractABI,
+                                    this.web3TokenContract.contractAddress
+                                );
+                                console.log('WalletManager.onLoginSuccess: Web3TokenContract.tokenContract 已基于手动设置的 web3 重新创建。');
+                             } else {
+                                console.warn('WalletManager.onLoginSuccess: 无法重新创建 tokenContract，缺少 ABI, address 或 web3 实例。');
+                             }
+                        }
+                        console.log('WalletManager.onLoginSuccess: Web3TokenContract.userAddress 最终为:', this.web3TokenContract.userAddress);
+                        
+                        // 尝试获取余额进行验证
+                        if (this.account && typeof this.web3TokenContract.getBalance === 'function') {
+                            console.log(`WalletManager.onLoginSuccess: 尝试为账户 ${this.account} 获取余额...`);
+                            const balanceResult = await this.web3TokenContract.getBalance(this.account);
+                            if (balanceResult && balanceResult.balanceInEther !== undefined) {
+                                console.log('WalletManager.onLoginSuccess: 获取到的余额信息:', balanceResult.balanceInEther, 'tokens');
+                            } else {
+                                console.error('WalletManager.onLoginSuccess: 获取余额失败或返回结果格式不正确。', balanceResult);
+                            }
+                        } else {
+                            console.warn('WalletManager.onLoginSuccess: 无法获取余额，账户未定义或getBalance方法不存在。');
+                        }
+
+                    } else {
+                        console.error('WalletManager.onLoginSuccess: Web3TokenContract 初始化失败（contractInitialized为false）。');
+                    }
+                }
             } catch (initError) {
-                console.error('在 onLoginSuccess 中初始化 Web3TokenContract 时出错:', initError);
+                console.error('WalletManager.onLoginSuccess: 处理 Web3TokenContract 初始化时发生错误:', initError);
             }
         } else {
-            console.warn('在 onLoginSuccess 中，Web3TokenContract, provider, 或 account 不可用，无法执行初始化。');
+            console.error("WalletManager.onLoginSuccess: web3TokenContract 实例未定义，无法初始化。");
         }
 
         // 从后端同步数据到本地，防止本地数据被篡改

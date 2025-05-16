@@ -94,23 +94,28 @@ const TokenRecharge = {
                 if (initResult) {
                     console.log('Web3代币合约初始化成功');
 
-                    // 获取代币信息
                     const tokenInfo = await Web3TokenContract.getTokenInfo();
-                    if (tokenInfo) {
-                        console.log('获取到代币信息:', tokenInfo);
-
-                        // 更新代币名称
-                        if (tokenInfo.symbol) {
-                            this.config.TOKEN_NAME = tokenInfo.symbol;
-                            console.log('更新代币名称为:', tokenInfo.symbol);
-
-                            // 更新UI中的代币名称
-                            const unitLabels = document.querySelectorAll('.token-unit-label');
-                            unitLabels.forEach(label => {
-                                label.textContent = tokenInfo.symbol;
-                            });
+                    if (tokenInfo && tokenInfo.symbol) {
+                        this.config.TOKEN_NAME = tokenInfo.symbol;
+                        if (typeof tokenInfo.decimals !== 'undefined') {
+                            this.config.TOKEN_DECIMALS = tokenInfo.decimals;
+                        }
+                        console.log('TokenRecharge.init: 从 Web3TokenContract.getTokenInfo 获取到代币信息:', tokenInfo);
+                    } else {
+                        console.warn('TokenRecharge.init: 未能从 Web3TokenContract.getTokenInfo 获取代币信息。将尝试使用现有配置或默认值。');
+                        if (!this.config.TOKEN_NAME) { // 确保 TOKEN_NAME 有一个回退值
+                            this.config.TOKEN_NAME = '代币';
+                            console.warn('TokenRecharge.init: this.config.TOKEN_NAME 未定义, 设置为默认 "代币"。');
                         }
                     }
+                    // 确保 tokenSymbolForUI 使用更新后的 this.config.TOKEN_NAME
+                    const tokenSymbolForUI = this.config.TOKEN_NAME;
+
+                    // 更新UI中的代币名称
+                    const unitLabels = document.querySelectorAll('.token-unit-label');
+                    unitLabels.forEach(label => {
+                        label.textContent = tokenSymbolForUI;
+                    });
 
                     // 获取代币税率
                     try {
@@ -961,19 +966,20 @@ const TokenRecharge = {
                             }
                             console.log('ApiService.getRechargeSignature 将使用的合约地址:', contractAddress);
 
-                            // 检查是否使用反向兑换模式 (此模式不直接传递给 getRechargeSignature, 但可能用于后续合约调用)
-                            let inverseMode = false; // 对于充值，通常不是反向的
+                            // 检查是否使用反向兑换模式
+                            let inverseMode = true; // 默认使用反向模式
                             if (typeof Web3Config !== 'undefined' && Web3Config.RECHARGE && Web3Config.RECHARGE.INVERSE_MODE !== undefined) {
                                 inverseMode = Web3Config.RECHARGE.INVERSE_MODE;
                             }
-                            console.log('- 反向兑换模式 (用于后续逻辑, 非签名参数):', inverseMode);
+                            console.log('- 反向兑换模式 (用于签名和后续逻辑):', inverseMode);
 
-                            // 从API获取签名
+                            // 从API获取签名，传递 inverseMode 参数
                             signatureData = await ApiService.getRechargeSignature(
                                 this.walletAddress,
                                 tokenAmountToUse,
                                 gameCoinsToGain,
-                                contractAddress // 正确传递合约地址
+                                contractAddress, // 正确传递合约地址
+                                inverseMode // 添加 inverseMode 参数
                             );
 
                             if (!signatureData || !signatureData.success) {
@@ -1068,9 +1074,32 @@ const TokenRecharge = {
                         const revertReason = contractError.message.match(/reason string: '(.+?)'/);
                         if (revertReason && revertReason[1]) {
                             errorMessage = `合约执行失败: ${revertReason[1]}`;
+
+                            // 检查是否是nonce已使用的错误
+                            if (revertReason[1].includes('nonce already used') ||
+                                revertReason[1].includes('Nonce already used') ||
+                                revertReason[1].includes('已使用的nonce')) {
+                                errorMessage = '交易已被处理，请刷新页面后重试';
+                                // 自动刷新页面以获取新的nonce
+                                setTimeout(() => {
+                                    window.location.reload();
+                                }, 3000);
+                            }
+                        } else {
+                            // 如果没有明确的错误原因，但交易被拒绝，很可能是nonce已被使用
+                            console.log('交易被拒绝，可能是nonce已被使用，尝试刷新页面获取新的nonce');
+                            errorMessage = '交易被拒绝，请刷新页面后重试';
+                            // 自动刷新页面以获取新的nonce
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 3000);
                         }
-                    } else if (contractError.message.includes('nonce already used')) {
+                    } else if (contractError.message.includes('nonce already used') || contractError.message.includes('此Nonce已被使用')) {
                         errorMessage = '交易已被处理，请刷新页面后重试';
+                        // 自动刷新页面以获取新的nonce
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 3000);
                     } else if (contractError.message.includes('invalid signature')) {
                         errorMessage = '签名验证失败，请刷新页面后重试';
                     }

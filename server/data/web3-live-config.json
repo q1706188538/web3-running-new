@@ -1,7 +1,7 @@
 {
   "GAME": {
-    "START_COST": 200,
-    "RESTART_COST": 200,
+    "START_COST": 300,
+    "RESTART_COST": 300,
     "DEBUG_MODE": false,
     "USE_API": true,
     "API_BASE_URL": "/api"
@@ -27,7 +27,7 @@
   "EXCHANGE": {
     "RATE": 100,
     "INVERSE_MODE": true,
-    "MIN_AMOUNT": 100,
+    "MIN_AMOUNT": 1,
     "MAX_AMOUNT": 1000000,
     "TAX_RATE": 1000
   },

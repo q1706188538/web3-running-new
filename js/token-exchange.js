@@ -1,3 +1,8 @@
+// Helper function to generate a nonce
+function generateNonce() {
+    // Generates a random alphanumeric string
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}
 /**
  * 代币兑换模块
  * 用于实现游戏金币兑换Web3代币的功能
@@ -15,14 +20,25 @@ const TokenExchange = {
     // 当前代币余额
     currentTokens: 0,
 
-    // 兑换配置
+    // 兑换配置 (将作为从合约获取配置失败时的回退)
     config: {
-        TOKEN_NAME: "TWB",
-        COINS_PER_TOKEN: 100,
-        MIN_EXCHANGE_AMOUNT: 1,
-        MAX_EXCHANGE_AMOUNT: 100000000,
-        EXCHANGE_FEE_PERCENT: 0, // 不再使用金币税
-        TOKEN_TAX_PERCENT: 2 // 代币税率，2%
+        TOKEN_NAME: "TWB", // 会被合约的 externalToken().symbol() 覆盖
+        TOKEN_DECIMALS: 18, // 会被合约的 externalToken().decimals() 覆盖
+        COINS_PER_TOKEN: 100, // 汇率: X金币 = 1代币单位. 会被合约的 exchangeRate() 覆盖
+        MIN_EXCHANGE_AMOUNT: 1, // 以代币单位. 会被合约的 minExchangeAmount() 覆盖
+        MAX_EXCHANGE_AMOUNT: 100000000, // 以代币单位. 会被合约的 maxExchangeAmount() 覆盖
+        TOKEN_TAX_PERCENT: 2, // 代币税率 %. 会被合约的 taxRate 覆盖
+        // 新增: 用于存储从合约直接获取的配置
+        contractConfig: {
+            inverseMode: null, // boolean: true for coin->token, false for token->coin
+            exchangeRate: null, // BigInt: 合约原始汇率 (e.g., 1 token WEI = X game coins, or 1 game coin = X token WEI)
+            exchangeTokenTaxRateBPS: null, // BigInt: BPS for coin->token
+            rechargeTokenTaxRateBPS: null, // BigInt: BPS for token->coin
+            minExchangeAmountWei: null, // BigInt: wei
+            maxExchangeAmountWei: null, // BigInt: wei
+            tokenDecimals: 18, // Default, will be updated from externalToken
+            tokenSymbol: "TWB" // Default, will be updated
+        }
     },
 
     // 初始化
@@ -30,138 +46,305 @@ const TokenExchange = {
         if (this.initialized) {
             return;
         }
+        console.log('初始化代币兑换模块 TokenExchange.init...');
 
-        console.log('初始化代币兑换模块...');
-
-        // 首先尝试从Web3Config获取配置
-        if (typeof Web3Config !== 'undefined') {
-            // 更新配置
-            if (Web3Config.TOKEN && Web3Config.TOKEN.NAME) {
-                this.config.TOKEN_NAME = Web3Config.TOKEN.NAME;
-            }
-
-            if (Web3Config.EXCHANGE && Web3Config.EXCHANGE.RATE) {
-                this.config.COINS_PER_TOKEN = Web3Config.EXCHANGE.RATE;
-            }
-
-            if (Web3Config.EXCHANGE && Web3Config.EXCHANGE.MIN_AMOUNT) {
-                this.config.MIN_EXCHANGE_AMOUNT = Web3Config.EXCHANGE.MIN_AMOUNT;
-            }
-
-            if (Web3Config.EXCHANGE && Web3Config.EXCHANGE.MAX_AMOUNT) {
-                this.config.MAX_EXCHANGE_AMOUNT = Web3Config.EXCHANGE.MAX_AMOUNT;
-            }
-
-            if (Web3Config.EXCHANGE && Web3Config.EXCHANGE.TAX_RATE) {
-                this.config.TOKEN_TAX_PERCENT = Web3Config.EXCHANGE.TAX_RATE / 100; // 基点转换为百分比
-            }
-
-            console.log('从Web3Config加载代币兑换配置:', this.config);
-        }
-        // 如果Web3Config不存在或没有配置，尝试从GameConfig中获取
-        else if (typeof GameConfig !== 'undefined' && GameConfig.TOKEN_EXCHANGE) {
-            this.config = GameConfig.TOKEN_EXCHANGE;
-            console.log('从GameConfig加载代币兑换配置:', this.config);
-        }
-
-        // 创建UI
+        // 1. 创建UI结构 (此时不填充动态数据)
         this.createUI();
-
-        // 添加事件监听器
         this.addEventListeners();
 
-        // 添加对最小兑换金额更新的监听
-        document.addEventListener('minExchangeAmountUpdated', (event) => {
-            const minAmount = event.detail.minExchangeAmount;
-            console.log('收到最小兑换金额更新:', minAmount);
-
-            // 更新本地配置
-            this.config.MIN_EXCHANGE_AMOUNT = minAmount;
-
-            // 更新UI中的最小兑换金额显示
-            this.updateMinExchangeAmountUI(minAmount);
-        });
-
-        // 初始化Web3代币合约
+        // 2. 初始化Web3和合约实例 (Web3TokenContract)
         if (typeof Web3TokenContract !== 'undefined') {
             try {
-                const initResult = await Web3TokenContract.init();
-                if (initResult) {
-                    console.log('Web3代币合约初始化成功');
-
-                    // 获取代币信息
-                    const tokenInfo = await Web3TokenContract.getTokenInfo();
-                    if (tokenInfo) {
-                        console.log('获取到代币信息:', tokenInfo);
-
-                        // 更新代币名称
-                        if (tokenInfo.symbol) {
-                            this.config.TOKEN_NAME = tokenInfo.symbol;
-                            console.log('更新代币名称为:', tokenInfo.symbol);
-
-                            // 更新UI中的代币名称
-                            const unitLabels = document.querySelectorAll('.token-unit-label');
-                            unitLabels.forEach(label => {
-                                label.textContent = tokenInfo.symbol;
-                            });
-                        }
-                    }
-
-                    // 获取代币税率
-                    try {
-                        // 检查是否已经从Web3Config加载了税率
-                        let taxRateFromConfig = false;
-                        if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.TAX_RATE !== undefined) {
-                            taxRateFromConfig = true;
-                            console.log('已从Web3Config加载税率:', Web3Config.EXCHANGE.TAX_RATE / 100, '%');
-                        }
-
-                        // 如果没有从Web3Config加载税率，才从合约获取
-                        if (!taxRateFromConfig) {
-                            const taxRates = await Web3TokenContract.getTokenTaxRates();
-                            if (taxRates) {
-                                console.log('获取到代币税率:', taxRates);
-
-                                // 更新兑换代币税率
-                                if (taxRates.exchangeTokenTaxRate !== undefined) {
-                                    this.config.TOKEN_TAX_PERCENT = taxRates.exchangeTokenTaxRate / 100;
-                                    console.log('更新兑换代币税率为:', this.config.TOKEN_TAX_PERCENT, '%');
-                                }
-                            }
-                        }
-
-                        // 更新UI中的代币税率
-                        // 在初始化时，UI可能还没有创建，所以我们需要在show方法中更新
-                        this.updateTaxRateUI();
-                    } catch (taxError) {
-                        console.warn('获取代币税率失败:', taxError);
-                    }
-
-                    // 监听代币转账事件
-                    Web3TokenContract.listenToTransferEvents(eventData => {
-                        console.log('收到代币转账事件，更新余额:', eventData);
-                        this.updateBalances();
-                    });
-
-                    // 添加页面卸载时的清理函数
-                    window.addEventListener('beforeunload', () => {
-                        console.log('页面即将卸载，停止事件监听');
-                        Web3TokenContract.stopListeningToTransferEvents();
-                    });
+                const web3ContractInitSuccess = await Web3TokenContract.init(); //确保 Web3TokenContract.init 完成
+                if (!web3ContractInitSuccess || !Web3TokenContract.tokenContract) {
+                    console.error('TokenExchange.init: Web3TokenContract 初始化失败或合约实例未创建。将使用API模式或默认配置。');
+                    this.loadFallbackConfig(); // 加载基于Web3Config/GameConfig的旧配置作为回退
                 } else {
-                    console.warn('Web3代币合约初始化失败，将使用API模式');
+                    console.log('TokenExchange.init: Web3TokenContract 初始化成功。');
+                    // 3. 加载配置 (回滚到使用 Web3Config)
+                    console.log('TokenExchange.init: Web3TokenContract 初始化成功，现在加载回退/Web3Config 配置。');
+                    this.loadFallbackConfig(); // 主要配置加载点
+
+                    // 确保在 loadFallbackConfig 后更新UI中可能依赖的代币名称
+                    // TOKEN_NAME 和 TOKEN_DECIMALS 会在 loadFallbackConfig 中从 Web3Config 设置
+                    // contractConfig.tokenSymbol 和 contractConfig.tokenDecimals 也会在那里得到处理
+                    if (this.config.TOKEN_NAME) {
+                         this.updateTokenNameInUI(this.config.TOKEN_NAME);
+                         console.log('TokenExchange.init: 使用的代币名称 (来自Web3Config):', this.config.TOKEN_NAME);
+                    } else if (this.config.contractConfig && this.config.contractConfig.tokenSymbol) {
+                         this.updateTokenNameInUI(this.config.contractConfig.tokenSymbol);
+                         console.log('TokenExchange.init: 使用的代币名称 (来自contractConfig.tokenSymbol):', this.config.contractConfig.tokenSymbol);
+                    } else {
+                        console.warn('TokenExchange.init: 未能从配置中确定代币名称。');
+                    }
+                    // 移除了对 loadAndApplyContractConfig 和 getTokenInfoFromExternal 的调用
                 }
             } catch (error) {
-                console.error('初始化Web3代币合约时出错:', error);
+                console.error('TokenExchange.init: 初始化Web3TokenContract时出错:', error); // 移除了 "或加载合约配置时"
+                this.loadFallbackConfig(); // 出错则加载旧配置
             }
         } else {
-            console.warn('Web3TokenContract未定义，将使用API模式');
+            console.warn('TokenExchange.init: Web3TokenContract 未定义，将使用API模式或默认配置。');
+            this.loadFallbackConfig();
+        }
+
+        // 旧的配置加载逻辑，现在移到 loadFallbackConfig
+        // this.loadFallbackConfig(); // 如果上面成功，这里就不需要了
+
+        // 添加事件监听器 - 已提前
+        // this.addEventListeners();
+
+        // 监听代币转账事件 (如果Web3TokenContract已成功初始化)
+        if (Web3TokenContract && Web3TokenContract.listenToTransferEvents) {
+             Web3TokenContract.listenToTransferEvents(eventData => {
+                console.log('收到代币转账事件，更新余额:', eventData);
+                this.updateBalances();
+            });
+            window.addEventListener('beforeunload', () => {
+                console.log('页面即将卸载，停止事件监听');
+                if (Web3TokenContract.stopListeningToTransferEvents) {
+                    Web3TokenContract.stopListeningToTransferEvents();
+                }
+            });
         }
 
         // 标记为已初始化
         this.initialized = true;
+        console.log('TokenExchange.init: 代币兑换模块初始化流程完成。');
+        // 初始UI更新应在 show() 方法中或此处显式调用 updateAllDynamicUI()
+        this.updateAllDynamicUI();
+    },
 
-        console.log('代币兑换模块初始化完成');
+    loadFallbackConfig: function() {
+        console.log('TokenExchange.loadFallbackConfig: 加载基于Web3Config/GameConfig的回退配置...');
+        if (typeof Web3Config !== 'undefined') {
+            // Load from Web3Config first
+            if (Web3Config.TOKEN) {
+                if (typeof Web3Config.TOKEN.NAME === 'string' && Web3Config.TOKEN.NAME.trim() !== '') {
+                    this.config.TOKEN_NAME = Web3Config.TOKEN.NAME;
+                    if (this.config.contractConfig) this.config.contractConfig.tokenSymbol = Web3Config.TOKEN.NAME;
+                }
+                if (typeof Web3Config.TOKEN.DECIMALS === 'number' && !isNaN(Web3Config.TOKEN.DECIMALS)) {
+                    this.config.TOKEN_DECIMALS = Web3Config.TOKEN.DECIMALS;
+                    if (this.config.contractConfig) this.config.contractConfig.tokenDecimals = Web3Config.TOKEN.DECIMALS;
+                }
+            }
+            if (Web3Config.EXCHANGE && Web3Config.EXCHANGE.RATE) this.config.COINS_PER_TOKEN = Web3Config.EXCHANGE.RATE;
+            if (Web3Config.EXCHANGE && Web3Config.EXCHANGE.MIN_AMOUNT) this.config.MIN_EXCHANGE_AMOUNT = Web3Config.EXCHANGE.MIN_AMOUNT;
+            if (Web3Config.EXCHANGE && Web3Config.EXCHANGE.MAX_AMOUNT) this.config.MAX_EXCHANGE_AMOUNT = Web3Config.EXCHANGE.MAX_AMOUNT;
+            if (Web3Config.EXCHANGE && Web3Config.EXCHANGE.TAX_RATE !== undefined) { // TAX_RATE is BPS
+                this.config.TOKEN_TAX_PERCENT = Web3Config.EXCHANGE.TAX_RATE / 100; // BPS to %
+            }
+            // Determine inverseMode
+            this.config.contractConfig = this.config.contractConfig || {}; // Ensure contractConfig object exists
+// 从 Web3Config 加载合约地址到 this.config.contractConfig.contractAddress
+            if (typeof Web3Config !== 'undefined' && Web3Config.BRIDGE_CONTRACT && typeof Web3Config.BRIDGE_CONTRACT.ADDRESS === 'string' && Web3Config.BRIDGE_CONTRACT.ADDRESS.trim() !== '') {
+                this.config.contractConfig.contractAddress = Web3Config.BRIDGE_CONTRACT.ADDRESS;
+                console.log('TokenExchange.loadFallbackConfig: contractAddress populated from Web3Config.BRIDGE_CONTRACT.ADDRESS:', this.config.contractConfig.contractAddress);
+            } else {
+                // 尝试从 GameConfig 加载 (如果 GameConfig 遵循相似的结构)
+                if (typeof GameConfig !== 'undefined' && GameConfig.BRIDGE_CONTRACT && typeof GameConfig.BRIDGE_CONTRACT.ADDRESS === 'string' && GameConfig.BRIDGE_CONTRACT.ADDRESS.trim() !== '') {
+                    this.config.contractConfig.contractAddress = GameConfig.BRIDGE_CONTRACT.ADDRESS;
+                    console.log('TokenExchange.loadFallbackConfig: contractAddress populated from GameConfig.BRIDGE_CONTRACT.ADDRESS:', this.config.contractConfig.contractAddress);
+                } else {
+                    console.error('TokenExchange.loadFallbackConfig: Bridge contract address (contractAddress) could not be loaded from Web3Config or GameConfig.BRIDGE_CONTRACT.ADDRESS.');
+                    // this.config.contractConfig.contractAddress 保持 undefined 或可以显式设置为 null
+                    this.config.contractConfig.contractAddress = null; 
+                }
+            }
+            let inverseModeFound = false;
+            if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && typeof Web3Config.EXCHANGE.INVERSE_MODE === 'boolean') {
+                this.config.contractConfig.inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
+                inverseModeFound = true;
+            }
+
+            if (!inverseModeFound &&
+                typeof GameConfig !== 'undefined' && GameConfig.TOKEN_EXCHANGE &&
+                GameConfig.TOKEN_EXCHANGE.contractConfig &&
+                typeof GameConfig.TOKEN_EXCHANGE.contractConfig.inverseMode === 'boolean') {
+                this.config.contractConfig.inverseMode = GameConfig.TOKEN_EXCHANGE.contractConfig.inverseMode;
+                inverseModeFound = true;
+            }
+
+            if (!inverseModeFound) {
+                console.warn('loadFallbackConfig: inverseMode not found or not a boolean in Web3Config/GameConfig. Defaulting to false (Coin -> Token).');
+                this.config.contractConfig.inverseMode = false; // Default to Coin -> Token
+            }
+            console.log('TokenExchange.loadFallbackConfig: 从Web3Config加载的配置 (或GameConfig/defaulted inverseMode):', this.config);
+        } else if (typeof GameConfig !== 'undefined' && GameConfig.TOKEN_EXCHANGE) { // Web3Config was undefined, try GameConfig for everything
+            Object.assign(this.config, GameConfig.TOKEN_EXCHANGE); // Simple merge for GameConfig
+            // Ensure contractConfig and its inverseMode after GameConfig merge
+            this.config.contractConfig = this.config.contractConfig || {};
+            if (typeof this.config.contractConfig.inverseMode !== 'boolean') {
+                 // If GameConfig provided contractConfig but not a boolean inverseMode, or no contractConfig at all
+                console.warn('loadFallbackConfig: inverseMode not found or not a boolean after GameConfig. Defaulting to false (Coin -> Token).');
+                this.config.contractConfig.inverseMode = false;
+            }
+            console.log('TokenExchange.loadFallbackConfig: 从GameConfig加载的配置:', this.config);
+        } else {
+            // Neither Web3Config nor GameConfig defined, ensure contractConfig and default inverseMode
+            this.config.contractConfig = this.config.contractConfig || {};
+            if (typeof this.config.contractConfig.inverseMode !== 'boolean') {
+                console.warn('loadFallbackConfig: inverseMode not found (no Web3Config/GameConfig). Defaulting to false (Coin -> Token).');
+                this.config.contractConfig.inverseMode = false;
+            }
+        }
+
+        // After any potential merge, ensure critical contractConfig fields are present (excluding inverseMode, handled above)
+        if (this.config.contractConfig) {
+            // Ensure tokenDecimals in contractConfig has a valid fallback, respecting this.config.TOKEN_DECIMALS if set
+            if (typeof this.config.contractConfig.tokenDecimals !== 'number' || isNaN(this.config.contractConfig.tokenDecimals)) {
+                this.config.contractConfig.tokenDecimals = (typeof this.config.TOKEN_DECIMALS === 'number' && !isNaN(this.config.TOKEN_DECIMALS))
+                    ? this.config.TOKEN_DECIMALS
+                    : 18; // Absolute default
+                console.warn(`loadFallbackConfig: contractConfig.tokenDecimals was invalid, set to: ${this.config.contractConfig.tokenDecimals}`);
+            }
+            // Ensure tokenSymbol in contractConfig has a valid fallback, respecting this.config.TOKEN_NAME if set
+            if (typeof this.config.contractConfig.tokenSymbol !== 'string' || this.config.contractConfig.tokenSymbol.trim() === '') {
+                this.config.contractConfig.tokenSymbol = (typeof this.config.TOKEN_NAME === 'string' && this.config.TOKEN_NAME.trim() !== '')
+                    ? this.config.TOKEN_NAME
+                    : "TWB"; // Absolute default
+                console.warn(`loadFallbackConfig: contractConfig.tokenSymbol was invalid, set to: ${this.config.contractConfig.tokenSymbol}`);
+            }
+        } else {
+            // If contractConfig itself is missing, re-initialize with defaults, trying to use global config values if available
+            console.warn('loadFallbackConfig: this.config.contractConfig is missing, re-initializing.');
+            this.config.contractConfig = {
+                // inverseMode is now handled comprehensively above, so it should be set before this block if contractConfig was missing
+                // exchangeRate, exchangeTokenTaxRateBPS, rechargeTokenTaxRateBPS, minExchangeAmountWei, maxExchangeAmountWei are not strictly part of this fallback logic's primary goal
+                // but keeping them as null if not otherwise defined is fine.
+                exchangeRate: null,
+                exchangeTokenTaxRateBPS: null,
+                rechargeTokenTaxRateBPS: null,
+                minExchangeAmountWei: null,
+                maxExchangeAmountWei: null,
+                tokenDecimals: (typeof this.config.TOKEN_DECIMALS === 'number' && !isNaN(this.config.TOKEN_DECIMALS)) ? this.config.TOKEN_DECIMALS : 18,
+                tokenSymbol: (typeof this.config.TOKEN_NAME === 'string' && this.config.TOKEN_NAME.trim() !== '') ? this.config.TOKEN_NAME : "TWB"
+            };
+             // GameConfig fallback for inverseMode was already incorporated into the main inverseMode logic block above.
+        }
+
+        // Update UI elements that depend on these fallback configs
+        // Prioritize TOKEN_NAME, then contractConfig.tokenSymbol, then a generic fallback.
+        const finalTokenNameToDisplay = (typeof this.config.TOKEN_NAME === 'string' && this.config.TOKEN_NAME.trim() !== '')
+            ? this.config.TOKEN_NAME
+            : (this.config.contractConfig && typeof this.config.contractConfig.tokenSymbol === 'string' && this.config.contractConfig.tokenSymbol.trim() !== '')
+                ? this.config.contractConfig.tokenSymbol
+                : "代币"; // Generic fallback for UI
+        this.updateTokenNameInUI(finalTokenNameToDisplay);
+        console.log('TokenExchange.loadFallbackConfig: Final token name for UI:', finalTokenNameToDisplay);
+    },
+
+    loadAndApplyContractConfig: async function() {
+        // 此函数在回滚后不再需要，因为配置将完全依赖 Web3Config (通过 loadFallbackConfig 加载)
+        // 保留函数结构以防万一，但其内容被注释掉。
+        /*
+        console.log('TokenExchange.loadAndApplyContractConfig: 尝试从合约加载动态配置...');
+        const contractCfg = await Web3TokenContract.getContractExchangeConfig();
+        if (contractCfg) {
+            console.log('TokenExchange.loadAndApplyContractConfig: 从合约获取的配置:', contractCfg);
+            this.config.contractConfig.inverseMode = contractCfg.inverseMode;
+            this.config.contractConfig.exchangeRate = contractCfg.exchangeRate; // raw BigInt
+            this.config.contractConfig.exchangeTokenTaxRateBPS = contractCfg.exchangeTokenTaxRateBPS; // raw BigInt BPS
+            this.config.contractConfig.rechargeTokenTaxRateBPS = contractCfg.rechargeTokenTaxRateBPS; // raw BigInt BPS
+            this.config.contractConfig.minExchangeAmountWei = contractCfg.minExchangeAmount; // raw BigInt wei
+            this.config.contractConfig.maxExchangeAmountWei = contractCfg.maxExchangeAmount; // raw BigInt wei
+
+            // 更新 this.config 中的值，用于UI显示和计算 (需要进行单位转换)
+            // 汇率: COINS_PER_TOKEN (X金币 = 1代币单位)
+            // 合约 exchangeRate: 1 token WEI = Y game coins (or other interpretation, needs clarity from contract)
+            // 假设合约 exchangeRate 是 1 个完整代币单位 = X 金币 (即 contractCfg.exchangeRate 是一个表示金币数量的数字)
+            // 那么 this.config.COINS_PER_TOKEN = parseFloat(contractCfg.exchangeRate.toString());
+            // 这是一个复杂点，取决于合约 exchangeRate 的确切含义。暂时保留旧的 COINS_PER_TOKEN 更新方式，
+            // 并在 updateCalculation 中直接使用 contractConfig.exchangeRate 进行精确计算。
+            // For now, let's assume Web3TokenContract.web3.utils.fromWei can be used if exchangeRate means "coins per 1 ETH equiv of token"
+            // This needs careful handling in updateCalculation.
+
+            // 税率
+            const currentTaxBPS = contractCfg.inverseMode ? contractCfg.exchangeTokenTaxRateBPS : contractCfg.rechargeTokenTaxRateBPS;
+            this.config.TOKEN_TAX_PERCENT = parseFloat(currentTaxBPS.toString()) / 100; // BPS to %
+
+            // 最小/最大兑换量 (转换为代币单位)
+            const decimals = this.config.contractConfig.tokenDecimals || 18;
+            if (contractCfg.minExchangeAmountWei) {
+                this.config.MIN_EXCHANGE_AMOUNT = parseFloat(Web3TokenContract.web3.utils.fromWei(contractCfg.minExchangeAmountWei.toString(), this.getUnitForDecimals(decimals)));
+            }
+            if (contractCfg.maxExchangeAmountWei) {
+                this.config.MAX_EXCHANGE_AMOUNT = parseFloat(Web3TokenContract.web3.utils.fromWei(contractCfg.maxExchangeAmountWei.toString(), this.getUnitForDecimals(decimals)));
+            }
+            console.log('TokenExchange.loadAndApplyContractConfig: 应用到 this.config后的值:', this.config);
+        } else {
+            console.warn('TokenExchange.loadAndApplyContractConfig: 从合约获取配置失败，将使用回退配置。');
+            this.loadFallbackConfig();
+        }
+        */
+        console.log('TokenExchange.loadAndApplyContractConfig: 此函数已废弃，配置通过 loadFallbackConfig 从 Web3Config 加载。');
+    },
+
+    getUnitForDecimals(decimals) {
+        if (decimals === 18) return 'ether';
+        if (decimals === 6) return 'mwei'; // For USDC, USDT often
+        // Add other common decimal units if needed
+        console.warn(`getUnitForDecimals: Unsupported decimals ${decimals}, defaulting to ether-like behavior for fromWei/toWei.`);
+        return 'ether'; // Fallback, though toWei/fromWei might behave unexpectedly for non-standard decimals if not 'ether'
+    },
+
+    // 辅助函数：将Wei转换为带正确小数的显示字符串
+    _formatWeiToDisplay: function(weiBigInt, decimals) {
+        if (typeof Web3TokenContract === 'undefined' || !Web3TokenContract.web3 || typeof weiBigInt === 'undefined' || typeof decimals === 'undefined') {
+            return weiBigInt ? weiBigInt.toString() : '0'; // Fallback
+        }
+        try {
+            const balanceBN = Web3TokenContract.web3.utils.toBN(weiBigInt.toString()); // BN can handle BigInt string
+            const divisor = Web3TokenContract.web3.utils.toBN(10).pow(Web3TokenContract.web3.utils.toBN(decimals));
+            
+            const integerPart = balanceBN.div(divisor);
+            const fractionalPart = balanceBN.mod(divisor);
+
+            if (fractionalPart.isZero()) {
+                return integerPart.toString();
+            } else {
+                // Ensure fractionalPart is padded correctly and trailing zeros are handled for display
+                const fractionalString = fractionalPart.toString().padStart(decimals, '0').replace(/0+$/, "");
+                // If fractionalString becomes empty (e.g. "00" -> ""), don't add "."
+                return `${integerPart.toString()}${fractionalString.length > 0 ? "." + fractionalString : ""}`;
+            }
+        } catch (e) {
+            console.error("TokenExchange._formatWeiToDisplay: Error formatting wei value", weiBigInt, decimals, e);
+            return weiBigInt ? weiBigInt.toString() : '0'; // Fallback on error
+        }
+    },
+    
+    updateInputLabelsAndPlaceholders: function() {
+        if (!this.config || !this.config.contractConfig) {
+            console.warn("updateInputLabelsAndPlaceholders: contractConfig not ready.");
+            return;
+        }
+        const tokenSymbol = this.config.contractConfig.externalTokenSymbol || '代币';
+        const gameCoinSymbol = '金币';
+        const amountInput = document.getElementById('token-exchange-amount');
+        const inputLabel = document.getElementById('token-exchange-input-label'); // Assuming this ID exists for the label
+        const unitLabel = document.getElementById('token-exchange-input-unit'); // Assuming this ID exists for the unit span
+
+        if (this.config.contractConfig.inverseMode) { // 金币兑换代币 (用户输入金币)
+            if (inputLabel) inputLabel.textContent = `兑换${gameCoinSymbol}:`;
+            if (amountInput) amountInput.placeholder = `输入支付的 ${gameCoinSymbol} 数量`;
+            if (unitLabel) unitLabel.textContent = gameCoinSymbol; // Unit next to input becomes gameCoinSymbol
+            // Balance display should already be correct via updateAllDynamicUI -> updateBalances
+        } else { // 代币兑换金币 (用户输入代币)
+            if (inputLabel) inputLabel.textContent = `支付 ${tokenSymbol}:`;
+            if (amountInput) amountInput.placeholder = `输入支付的 ${tokenSymbol} 数量`;
+            if (unitLabel) unitLabel.textContent = tokenSymbol; // Unit next to input becomes tokenSymbol
+        }
+    },
+
+    updateAllDynamicUI: function() {
+        console.log("TokenExchange.updateAllDynamicUI: 更新所有动态UI元素");
+        this.updateInputLabelsAndPlaceholders();
+        this.updateRateUI();
+        this.updateTaxRateUI();
+        this.updateMinExchangeAmountUI(); // MIN_EXCHANGE_AMOUNT is now in wei, handled by this func
+        this.updateCalculation();
     },
 
     // 创建UI
@@ -239,7 +422,7 @@ const TokenExchange = {
         // 创建金币余额
         const coinsBalance = document.createElement('p');
         coinsBalance.id = 'token-exchange-coins-balance';
-        coinsBalance.innerHTML = '可用金币: <span>0</span>';
+        coinsBalance.innerHTML = '余额: <span>0</span>';
         coinsBalance.style.cssText = `
             margin: 5px 0;
             font-size: 16px;
@@ -248,7 +431,8 @@ const TokenExchange = {
         // 创建代币余额
         const tokensBalance = document.createElement('p');
         tokensBalance.id = 'token-exchange-tokens-balance';
-        tokensBalance.innerHTML = `${this.config.TOKEN_NAME} 余额: <span>0</span>`;
+        // tokensBalance.innerHTML = `${this.config.TOKEN_NAME} 余额: <span>0</span>`; // Token name updated later
+        tokensBalance.innerHTML = `<span class="token-unit-label">${this.config.TOKEN_NAME}</span> 余额: <span>0</span>`;
         tokensBalance.style.cssText = `
             margin: 5px 0;
             font-size: 16px;
@@ -326,7 +510,7 @@ const TokenExchange = {
         // 创建兑换比例信息
         const rateInfo = document.createElement('p');
         rateInfo.id = 'token-exchange-rate-info';
-        rateInfo.innerHTML = `兑换比例: <strong>${this.config.COINS_PER_TOKEN}</strong> 金币 = <strong>1</strong> ${this.config.TOKEN_NAME}`;
+        // rateInfo.innerHTML = `兑换比例: <strong>${this.config.COINS_PER_TOKEN}</strong> 金币 = <strong>1</strong> ${this.config.TOKEN_NAME}`; // Updated by updateRateUI
         rateInfo.style.cssText = `
             margin: 10px 0;
             font-size: 14px;
@@ -336,7 +520,7 @@ const TokenExchange = {
         // 创建代币税信息
         const taxInfo = document.createElement('p');
         taxInfo.id = 'token-exchange-tax-info';
-        taxInfo.innerHTML = `代币税: <strong>${this.config.TOKEN_TAX_PERCENT}%</strong>`;
+        // taxInfo.innerHTML = `代币税: <strong>${this.config.TOKEN_TAX_PERCENT}%</strong>`; // Updated by updateTaxRateUI
         taxInfo.style.cssText = `
             margin: 5px 0 15px 0;
             font-size: 14px;
@@ -351,9 +535,10 @@ const TokenExchange = {
             margin-bottom: 15px;
         `;
 
-        // 创建输入标签
+        // 创建输入标签 - 内容会动态更新
         const inputLabel = document.createElement('label');
-        inputLabel.textContent = '兑换数量:';
+        inputLabel.id = 'token-exchange-input-label';
+        // inputLabel.textContent = '兑换数量:'; // Updated by updateInputLabelsAndPlaceholders
         inputLabel.style.cssText = `
             margin-right: 10px;
             font-size: 16px;
@@ -401,7 +586,7 @@ const TokenExchange = {
             }
 
             // 更新计算结果
-            TokenExchange.updateCalculation();
+            TokenExchange.handleInputChange(); // Changed from updateCalculation
         });
 
         // 在失去焦点时验证输入值
@@ -435,9 +620,11 @@ const TokenExchange = {
             font-size: 16px;
         `;
 
-        // 创建单位标签
+        // 创建单位标签 - 内容会动态更新
         const unitLabel = document.createElement('span');
-        unitLabel.textContent = this.config.TOKEN_NAME;
+        unitLabel.id = 'token-exchange-input-unit';
+        unitLabel.classList.add('token-unit-label'); // Class for easy update
+        // unitLabel.textContent = this.config.TOKEN_NAME; // Updated by updateTokenNameInUI
         unitLabel.style.cssText = `
             margin-left: 10px;
             font-size: 16px;
@@ -704,8 +891,15 @@ const TokenExchange = {
 
         // 确保已初始化
         if (!this.initialized) {
-            this.init();
+            await this.init(); // Make sure init completes
+        } else {
+            // 如果已初始化，可能需要刷新合约配置，以防在UI打开时发生变化
+            if (Web3TokenContract && Web3TokenContract.tokenContract) {
+                console.log("TokenExchange.show: UI已初始化，尝试刷新配置 (从Web3Config)...");
+                this.loadFallbackConfig(); // 改为调用 loadFallbackConfig
+            }
         }
+
 
         // 获取当前钱包地址
         if (typeof WalletManager !== 'undefined') {
@@ -713,43 +907,48 @@ const TokenExchange = {
         }
 
         if (!this.walletAddress) {
-            alert('请先连接钱包');
-            return;
+            // 尝试主动连接钱包
+            if (typeof Web3TokenContract !== 'undefined' && Web3TokenContract.initWeb3) {
+                const connected = await Web3TokenContract.initWeb3(); // This requests accounts
+                if (connected && Web3TokenContract.userAddress) {
+                    this.walletAddress = Web3TokenContract.userAddress;
+                    console.log("TokenExchange.show: 钱包连接成功:", this.walletAddress);
+                } else {
+                    alert('请先连接钱包');
+                    return;
+                }
+            } else {
+                alert('请先连接钱包 (Web3TokenContract not available)');
+                return;
+            }
         }
 
         // 显示加载中状态
-        this.showLoading(true);
+        this.showLoading(true, "加载配置和余额...");
 
         // 更新余额信息
         await this.updateBalances();
 
-        // 检查localStorage中是否有测试页面保存的值
+        // 更新所有动态UI元素，包括计算结果
+        this.updateAllDynamicUI();
+
+
+        // 检查localStorage中是否有测试页面保存的值 (保留此功能)
         const testValue = localStorage.getItem('inputTestValue');
         if (testValue) {
-            // 找到输入框并设置值
             const input = document.getElementById('token-exchange-amount');
             if (input) {
                 input.value = testValue;
-                // 清除localStorage中的值，避免重复使用
                 localStorage.removeItem('inputTestValue');
                 console.log('从测试页面应用值:', testValue);
+                this.updateCalculation(); // Re-calculate if value is set from test
             }
         }
+        
+        // 移除旧的强制从Web3Config更新税率的逻辑
+        // if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.TAX_RATE !== undefined) { ... }
 
-        // 更新计算结果
-        this.updateCalculation();
-
-        // 确保使用Web3Config中的税率
-        if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.TAX_RATE !== undefined) {
-            this.config.TOKEN_TAX_PERCENT = Web3Config.EXCHANGE.TAX_RATE / 100; // 基点转换为百分比
-            console.log('从Web3Config更新代币税率:', this.config.TOKEN_TAX_PERCENT, '%');
-        }
-
-        // 更新代币税率UI
-        this.updateTaxRateUI();
-
-        // 更新兑换比例UI
-        this.updateRateUI();
+        // UI更新已通过 updateAllDynamicUI() 处理
 
         // 显示兑换界面
         const container = document.getElementById('token-exchange-container');
@@ -833,650 +1032,416 @@ const TokenExchange = {
 
     // 更新计算结果
     updateCalculation: function() {
-        console.log('更新计算结果');
-
+        console.log('TokenExchange.updateCalculation: 更新计算结果 (回滚后逻辑)');
         const amountInput = document.getElementById('token-exchange-amount');
         const calculationElement = document.getElementById('token-exchange-calculation');
         const exchangeButton = document.getElementById('token-exchange-button');
 
-        if (!amountInput || !calculationElement || !exchangeButton) {
-            console.error('更新计算结果失败: 找不到必要的UI元素');
+        // Clear previous calculated values
+        this.calculatedGameCoinsInvolved = null;
+        this.calculatedNetTokensWei = null;
+        this.calculatedGrossTokensWei = null;
+        this.calculatedTaxAmountWei = null;
+        this.calculatedIsEnoughResources = false;
+        this.calculatedIsBelowMin = false;
+        this.calculatedIsAboveMax = false;
+
+        if (!amountInput || !calculationElement || !exchangeButton || !Web3TokenContract || !Web3TokenContract.web3 || !this.config) {
+            console.error('TokenExchange.updateCalculation: 必要的UI元素、Web3TokenContract或配置未初始化。');
+            if (calculationElement) calculationElement.innerHTML = '<p style="color: red;">计算组件错误，请刷新。</p>';
+            if (exchangeButton) exchangeButton.disabled = true;
+            return;
+        }
+        
+        // 使用 this.config 中的配置 (来自 Web3Config)
+        const inverseMode = this.config.contractConfig && typeof this.config.contractConfig.inverseMode === 'boolean' ? this.config.contractConfig.inverseMode : true; // 默认为金币换代币
+        const coinsPerToken = parseFloat(this.config.COINS_PER_TOKEN);
+        const tokenTaxPercent = parseFloat(this.config.TOKEN_TAX_PERCENT);
+        const tokenDecimals = parseInt(this.config.TOKEN_DECIMALS);
+        const minExchangeTokenUnit = parseFloat(this.config.MIN_EXCHANGE_AMOUNT); // 以代币单位
+        const maxExchangeTokenUnit = parseFloat(this.config.MAX_EXCHANGE_AMOUNT); // 以代币单位
+        const tokenSymbol = this.config.TOKEN_NAME || '代币';
+
+        if (isNaN(coinsPerToken) || isNaN(tokenTaxPercent) || isNaN(tokenDecimals) || isNaN(minExchangeTokenUnit) || isNaN(maxExchangeTokenUnit)) {
+            console.warn('TokenExchange.updateCalculation: 配置不完整 (汇率/税率/小数/最小最大值)，无法计算。');
+            calculationElement.innerHTML = '<p>兑换配置不完整...</p>';
+            exchangeButton.disabled = true;
             return;
         }
 
-        // 获取输入的代币数量
-        let tokenAmount = 0;
-
-        // 如果输入框为空，使用0
-        if (amountInput.value === '') {
-            tokenAmount = 0;
-        } else {
-            // 尝试解析为整数
-            let value = 0;
-            try {
-                // 过滤非数字字符
-                let numericValue = '';
-                for (let i = 0; i < amountInput.value.length; i++) {
-                    if (amountInput.value[i] >= '0' && amountInput.value[i] <= '9') {
-                        numericValue += amountInput.value[i];
-                    }
-                }
-
-                if (numericValue !== '') {
-                    value = parseInt(numericValue);
-                }
-            } catch (e) {
-                value = 0;
-            }
-
-            tokenAmount = value;
+        let inputValueString = amountInput.value.replace(/[^0-9.]/g, ''); // 允许小数点
+        if (inputValueString === '' || parseFloat(inputValueString) <= 0) {
+            calculationElement.innerHTML = '<p>请输入有效的数量。</p>';
+            exchangeButton.disabled = true;
+            return;
         }
+        const userInputValue = parseFloat(inputValueString);
 
-        // 检查是否使用反向兑换模式
-        let inverseMode = false;
-        if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
-            inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
-        }
+        const tokenUnitName = this.getUnitForDecimals(tokenDecimals); // 'ether', 'mwei', etc.
+        const multiplierForWei_BI = BigInt(10) ** BigInt(tokenDecimals);
+        const tenThousand_BI = BigInt(10000);
+        const taxRateBPS_BI = BigInt(Math.round(tokenTaxPercent * 100)); // TOKEN_TAX_PERCENT is %, convert to BPS
 
-        let requiredCoins = 0;
-        let totalCoinsNeeded = 0;
-
-        if (inverseMode) {
-            // 反向模式: 100代币=1金币
-            // 计算需要的金币数量
-            requiredCoins = tokenAmount / this.config.COINS_PER_TOKEN;
-            totalCoinsNeeded = requiredCoins; // 需要支付金币
-        } else {
-            // 正常模式: 1000金币=1代币
-            // 计算需要的金币数量
-            requiredCoins = tokenAmount * this.config.COINS_PER_TOKEN;
-            totalCoinsNeeded = requiredCoins; // 不再有金币税
-        }
-
-        // 确保使用Web3Config中的税率
-        if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.TAX_RATE !== undefined) {
-            this.config.TOKEN_TAX_PERCENT = Web3Config.EXCHANGE.TAX_RATE / 100; // 基点转换为百分比
-        }
-
-        // 计算代币税
-        const tokenTaxPercentage = this.config.TOKEN_TAX_PERCENT / 100;
-        const tokenTaxAmount = tokenAmount * tokenTaxPercentage;
-        const actualTokensReceived = tokenAmount - tokenTaxAmount;
-
-        // 更新计算结果
-        if (inverseMode) {
-            // 反向模式: 100代币=1金币
-            // 在反向模式下，玩家支付游戏金币，获得代币
-            // 代币从合约所有者转移到玩家，所以玩家不需要支付代币
-            calculationElement.innerHTML = `
-                <p>需要支付: <strong>${requiredCoins.toLocaleString()}</strong> 金币</p>
-                <p>将获得代币: <strong>${tokenAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
-                <p>代币税: <strong>${tokenTaxAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME} (${this.config.TOKEN_TAX_PERCENT}%)</p>
-                <p>实际获得: <strong>${(tokenAmount - tokenTaxAmount).toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
-                <p>税收钱包获得: <strong>${tokenTaxAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
-            `;
-        } else {
-            // 正常模式: 1000金币=1代币
-            calculationElement.innerHTML = `
-                <p>需要支付: <strong>${requiredCoins.toLocaleString()}</strong> 金币</p>
-                <p>应得代币: <strong>${tokenAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
-                <p>代币税: <strong>${tokenTaxAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME} (${this.config.TOKEN_TAX_PERCENT}%)</p>
-                <p>实际获得: <strong>${actualTokensReceived.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
-                <p>税收钱包获得: <strong>${tokenTaxAmount.toLocaleString()}</strong> ${this.config.TOKEN_NAME}</p>
-            `;
-        }
-
-        // 检查资源是否足够
+        let calculatedGameCoinsInvolved_BI;
+        let calculatedNetTokensWei_BI;
+        let calculatedGrossTokensWei_BI;
+        let calculatedTaxAmountWei_BI;
+        let htmlOutput = '';
         let isEnoughResources = false;
-        if (inverseMode) {
-            // 反向模式: 检查金币是否足够
-            isEnoughResources = this.currentCoins >= requiredCoins;
+        let isBelowMin = false;
+        let isAboveMax = false;
+        
+        let userInputTokensWei_BI; // 用户输入的代币数量 (Wei) - 可能是期望获得的净额或支付的毛额
 
-            // 如果金币不足，添加提示
-            if (!isEnoughResources) {
-                calculationElement.innerHTML += `
-                    <p style="color: red; margin-top: 10px;">金币不足，还需要 ${(requiredCoins - this.currentCoins).toLocaleString()} 金币</p>
-                `;
+        if (inverseMode) { // 金币兑换代币: 用户输入的是希望支付的【游戏金币】数量
+            // userInputValue is gameCoinAmount (e.g., 10 game coins)
+            const gameCoinAmount_input = userInputValue;
+            const tokensPerGC_config = parseFloat(this.config.COINS_PER_TOKEN); // e.g., 100 (Tokens per GC from EXCHANGE.RATE)
+
+            // 1. Calculate Gross Tokens user will receive (in token units)
+            const grossTokensUnit = gameCoinAmount_input * tokensPerGC_config; // e.g., 10 GC * 100 Tokens/GC = 1000 Tokens
+
+            // 2. Convert Gross Tokens to Wei. This is the amount for the transaction.
+            // this.calculatedNetTokensWei is used by performExchange. For this flow, it should hold GROSS tokens
+            // as server tax is an off-chain concept for this part, contract receives gross.
+            console.log('TokenExchange.updateCalculation (inverse): Attempting to set this.calculatedNetTokensWei. grossTokensUnit:', grossTokensUnit, 'tokenUnitName:', tokenUnitName, 'Web3TokenContract.web3 available:', !!(Web3TokenContract && Web3TokenContract.web3 && Web3TokenContract.web3.utils));
+            try {
+                this.calculatedNetTokensWei = BigInt(Web3TokenContract.web3.utils.toWei(grossTokensUnit.toString(), tokenUnitName));
+                console.log('TokenExchange.updateCalculation (inverse): this.calculatedNetTokensWei set to:', this.calculatedNetTokensWei ? this.calculatedNetTokensWei.toString() : 'undefined');
+            } catch (e) {
+                console.error('TokenExchange.updateCalculation (inverse): Error setting this.calculatedNetTokensWei:', e);
+                this.calculatedNetTokensWei = undefined; // Explicitly set to undefined on error
+                // Consider disabling exchange button or showing an error in calculationResult here
             }
-        } else {
-            // 正常模式: 检查金币是否足够
-            isEnoughResources = this.currentCoins >= totalCoinsNeeded;
+            
+            // For internal consistency in this function's calculations and display logic:
+            // Ensure calculatedGrossTokensWei_BI uses the potentially updated this.calculatedNetTokensWei
+            calculatedGrossTokensWei_BI = this.calculatedNetTokensWei || BigInt(0); // Default to 0 if undefined to prevent further errors
 
-            // 如果金币不足，添加提示
+            // 3. Game Coins involved is what user typed
+            this.calculatedGameCoinsInvolved = BigInt(Math.round(gameCoinAmount_input)); // Assign to instance property
+            console.log('TokenExchange.updateCalculation (inverse): this.calculatedGameCoinsInvolved set to:', this.calculatedGameCoinsInvolved ? this.calculatedGameCoinsInvolved.toString() : 'undefined');
+            // Keep local var for now if used later in this scope, or remove if this.calculatedGameCoinsInvolved is used directly
+            calculatedGameCoinsInvolved_BI = this.calculatedGameCoinsInvolved;
+calculatedNetTokensWei_BI = this.calculatedNetTokensWei; // Ensure local var gets value from instance property
+
+            // 4. For UI Display: Calculate server tax (based on config) and net tokens
+            // taxRateBPS_BI is already defined from this.config.TOKEN_TAX_PERCENT (e.g. 10% -> 1000 BPS)
+            // const tenThousand_BI = BigInt(10000); // Already defined above
+            // const taxRateBPS_BI = BigInt(Math.round(parseFloat(this.config.TOKEN_TAX_PERCENT) * 100)); // Already defined above
+
+            const displayedTaxAmountWei_for_UI_BI = (calculatedGrossTokensWei_BI * taxRateBPS_BI) / tenThousand_BI;
+            const displayedNetTokensWei_for_UI_BI = calculatedGrossTokensWei_BI - displayedTaxAmountWei_for_UI_BI;
+            
+            const grossTokens_Formatted = parseFloat(this._formatWeiToDisplay(calculatedGrossTokensWei_BI, tokenDecimals)).toLocaleString();
+            const serverTaxAmount_Formatted = parseFloat(this._formatWeiToDisplay(displayedTaxAmountWei_for_UI_BI, tokenDecimals)).toLocaleString();
+            const netTokens_Formatted = parseFloat(this._formatWeiToDisplay(displayedNetTokensWei_for_UI_BI, tokenDecimals)).toLocaleString();
+            const serverTaxPercent_Display = parseFloat(this.config.TOKEN_TAX_PERCENT) || 0;
+
+            htmlOutput = `
+                <p>您支付: <strong>${gameCoinAmount_input.toLocaleString()}</strong> 金币</p>
+                <p>可兑换 ${tokenSymbol} (毛额): <strong>${grossTokens_Formatted}</strong></p>
+                <p>服务器税 (${serverTaxPercent_Display.toFixed(2)}%): <strong>${serverTaxAmount_Formatted}</strong> ${tokenSymbol}</p>
+                <p>您将获得 ${tokenSymbol} (净额, 参考): <strong>${netTokens_Formatted}</strong></p>
+            `;
+            
+            isEnoughResources = BigInt(this.currentCoins.toString()) >= calculatedGameCoinsInvolved_BI;
             if (!isEnoughResources) {
-                calculationElement.innerHTML += `
-                    <p style="color: red; margin-top: 10px;">金币不足，还需要 ${(totalCoinsNeeded - this.currentCoins).toLocaleString()} 金币</p>
-                `;
+                 const neededMoreCoins = calculatedGameCoinsInvolved_BI - BigInt(this.currentCoins.toString());
+                 htmlOutput += `<p style="color: red; margin-top: 10px;">金币不足，还需要 ${neededMoreCoins.toLocaleString()} 金币</p>`;
+            }
+            
+            // Min/Max check (userInputValue is game coins, min/max in config are token units)
+            const minTokensConfig = minExchangeTokenUnit; // Min tokens (unit) from config
+            const maxTokensConfig = maxExchangeTokenUnit; // Max tokens (unit) from config
+
+            if (grossTokensUnit < minTokensConfig && minTokensConfig > 0 && tokensPerGC_config > 0) {
+                isBelowMin = true;
+                const minGameCoinsRequired = minTokensConfig / tokensPerGC_config;
+                htmlOutput += `<p style="color: orange; margin-top: 10px;">至少需要兑换 ${minTokensConfig.toLocaleString()} ${tokenSymbol} (即支付 ${minGameCoinsRequired.toLocaleString()} 金币)。</p>`;
+            }
+            if (grossTokensUnit > maxTokensConfig && maxTokensConfig > 0 && tokensPerGC_config > 0) {
+                isAboveMax = true;
+                const maxGameCoinsAllowed = maxTokensConfig / tokensPerGC_config;
+                htmlOutput += `<p style="color: orange; margin-top: 10px;">最多只能兑换 ${maxTokensConfig.toLocaleString()} ${tokenSymbol} (即支付 ${maxGameCoinsAllowed.toLocaleString()} 金币)。</p>`;
+            }
+        } else { // 代币兑换金币: 用户输入的是期望获得的【净代币】数量
+            userInputTokensWei_BI = BigInt(Web3TokenContract.web3.utils.toWei(userInputValue.toString(), tokenUnitName));
+            calculatedNetTokensWei_BI = userInputTokensWei_BI; // 用户输入的是净额
+
+            if (taxRateBPS_BI < BigInt(0) || taxRateBPS_BI >= tenThousand_BI) { // Tax rate must be < 100% for this calculation
+                 calculationElement.innerHTML = '<p style="color: red;">错误：税率配置不正确 (代币兑换金币时，税率必须小于100%)。</p>';
+                 this.disableExchangeButtonOnError(); return;
+            }
+            // Gross = Net / (1 - TaxRate) = Net * 10000 / (10000 - TaxBPS)
+            calculatedGrossTokensWei_BI = (calculatedNetTokensWei_BI * tenThousand_BI) / (tenThousand_BI - taxRateBPS_BI);
+            calculatedTaxAmountWei_BI = calculatedGrossTokensWei_BI - calculatedNetTokensWei_BI;
+            
+            // GameCoinsToReceive = GrossTokens (in unit) * CoinsPerToken
+            // (Here, grossTokensInUnit is the total tokens the user effectively "pays" or "forgoes" from their balance)
+            const grossTokensInUnit_forCoinCalc = parseFloat(Web3TokenContract.web3.utils.fromWei(calculatedGrossTokensWei_BI.toString(), tokenUnitName));
+            calculatedGameCoinsInvolved_BI = BigInt(Math.ceil(grossTokensInUnit_forCoinCalc * coinsPerToken)); // 金币获得
+
+            htmlOutput = `
+                <p>您希望获得 (净): <strong>${userInputValue.toLocaleString()}</strong> ${tokenSymbol}</p>
+                <p>代币税 (${tokenTaxPercent.toFixed(2)}%): <strong>${parseFloat(this._formatWeiToDisplay(calculatedTaxAmountWei_BI, tokenDecimals)).toLocaleString()}</strong> ${tokenSymbol}</p>
+                <p>总计支付代币 (税前): <strong>${parseFloat(this._formatWeiToDisplay(calculatedGrossTokensWei_BI, tokenDecimals)).toLocaleString()}</strong> ${tokenSymbol}</p>
+                <p>您将获得: <strong>${calculatedGameCoinsInvolved_BI.toLocaleString()}</strong> 金币</p>
+            `;
+            // 资源检查: 用户需要足够的代币 (gross amount)
+            isEnoughResources = BigInt(Web3TokenContract.web3.utils.toWei(this.currentTokens.toString(), tokenUnitName)) >= calculatedGrossTokensWei_BI;
+            if (!isEnoughResources) {
+                 const neededMoreTokensWei = calculatedGrossTokensWei_BI - BigInt(Web3TokenContract.web3.utils.toWei(this.currentTokens.toString(), tokenUnitName));
+                 htmlOutput += `<p style="color: red; margin-top: 10px;">${tokenSymbol} 不足，还需要 ${parseFloat(this._formatWeiToDisplay(neededMoreTokensWei, tokenDecimals)).toLocaleString()} ${tokenSymbol}</p>`;
             }
         }
 
-        // 更新兑换按钮状态
-        exchangeButton.disabled = !isEnoughResources;
-        exchangeButton.style.opacity = isEnoughResources ? '1' : '0.5';
-        exchangeButton.style.cursor = isEnoughResources ? 'pointer' : 'not-allowed';
+        // Min/Max checks (against user input token unit, or gross token unit involved)
+        // The amount being checked (userInputTokensWei_BI or calculatedGrossTokensWei_BI) should be compared against min/max in Wei.
+        const minExchangeAmountWei_BI = BigInt(Web3TokenContract.web3.utils.toWei(minExchangeTokenUnit.toString(), tokenUnitName));
+        const maxExchangeAmountWei_BI = BigInt(Web3TokenContract.web3.utils.toWei(maxExchangeTokenUnit.toString(), tokenUnitName));
+        
+        // Check against the gross amount of tokens involved in the transaction from the user's perspective of input.
+        // If coin->token, user inputs desired net tokens, we check this net amount.
+        // If token->coin, user inputs gross tokens to pay, we check this gross amount.
+        // Min/Max 检查应始终基于合约处理的总代币量 (税前)
+        const amountToCheckAgainstMinMaxWei_BI = calculatedGrossTokensWei_BI;
+
+
+        if (amountToCheckAgainstMinMaxWei_BI <= BigInt(0) && userInputValue > 0) {
+             htmlOutput += `<p style="color: red; margin-top: 10px;">计算得到的有效 ${tokenSymbol} 数量为零或无效。</p>`;
+        } else if (userInputValue > 0) {
+            if (amountToCheckAgainstMinMaxWei_BI < minExchangeAmountWei_BI) {
+                isBelowMin = true;
+                htmlOutput += `<p style="color: red; margin-top: 10px;">兑换数量低于最小限制 ${minExchangeTokenUnit.toLocaleString()} ${tokenSymbol}。</p>`;
+            }
+            if (amountToCheckAgainstMinMaxWei_BI > maxExchangeAmountWei_BI) {
+                isAboveMax = true;
+                htmlOutput += `<p style="color: red; margin-top: 10px;">兑换数量高于最大限制 ${maxExchangeTokenUnit.toLocaleString()} ${tokenSymbol}。</p>`;
+            }
+        }
+        
+        calculationElement.innerHTML = htmlOutput;
+        this.calculatedGameCoinsInvolved = calculatedGameCoinsInvolved_BI;
+        this.calculatedNetTokensWei = calculatedNetTokensWei_BI;
+        this.calculatedGrossTokensWei = calculatedGrossTokensWei_BI;
+        this.calculatedTaxAmountWei = calculatedTaxAmountWei_BI;
+        this.calculatedIsEnoughResources = isEnoughResources;
+        this.calculatedIsBelowMin = isBelowMin;
+        this.calculatedIsAboveMax = isAboveMax;
+        
+console.log(`[DEBUG] TokenExchange.updateCalculation END: GI=${this.calculatedGameCoinsInvolved ? this.calculatedGameCoinsInvolved.toString() : 'undef'}, NTW=${this.calculatedNetTokensWei ? this.calculatedNetTokensWei.toString() : 'undef'}`);
+        const isInputEffectivelyZero = userInputValue <= 0; // Check against parsed float
+        exchangeButton.disabled = isInputEffectivelyZero || !isEnoughResources || isBelowMin || isAboveMax || !this.calculatedGrossTokensWei || this.calculatedGrossTokensWei <= BigInt(0);
+        exchangeButton.style.opacity = exchangeButton.disabled ? '0.5' : '1';
+        exchangeButton.style.cursor = exchangeButton.disabled ? 'not-allowed' : 'pointer';
+    },
+
+    handleInputChange: function() {
+        this.updateCalculation();
+    },
+
+    disableExchangeButtonOnError: function() {
+        const exchangeButton = document.getElementById('token-exchange-button');
+        if (exchangeButton) {
+            exchangeButton.disabled = true;
+            exchangeButton.style.opacity = '0.5';
+            exchangeButton.style.cursor = 'not-allowed';
+        }
     },
 
     // 执行兑换
     performExchange: async function() {
-        console.log('执行代币兑换');
-
-        // 声明变量，使其在整个方法中可用
-        let signatureData = null;
-        let tokenAmount = 0;
-        let gameCoinsToUse = 0;
+        console.log('TokenExchange.performExchange: 执行代币兑换/充值');
+        const amountInput = document.getElementById('token-exchange-amount');
+        const inputValueString = amountInput ? amountInput.value.replace(/[^0-9]/g, '') : '0';
 
         if (!this.walletAddress) {
             this.showResultMessage('请先连接钱包', 'error');
-
-            // 尝试连接钱包
-            if (typeof Web3TokenContract !== 'undefined') {
-                try {
-                    console.log('尝试连接钱包...');
-                    await Web3TokenContract.initWeb3();
-
-                    // 检查是否成功连接
-                    if (Web3TokenContract.userAddress) {
-                        this.walletAddress = Web3TokenContract.userAddress;
-                        console.log('钱包连接成功:', this.walletAddress);
-                        this.showResultMessage('钱包已连接，请再次点击兑换按钮', 'success');
-                    } else {
-                        console.log('钱包连接失败');
-                        return;
-                    }
-                } catch (error) {
-                    console.error('连接钱包失败:', error);
+            // Attempt to auto-connect if not connected
+            if (typeof Web3TokenContract !== 'undefined' && Web3TokenContract.initWeb3) {
+                const connected = await Web3TokenContract.initWeb3(); // Ensure this updates this.walletAddress
+                if (connected && Web3TokenContract.userAddress) {
+                    this.walletAddress = Web3TokenContract.userAddress; // Explicitly update
+                    this.showResultMessage('钱包已连接，请重试操作。', 'info');
+                } else {
+                    this.showResultMessage('钱包连接失败，请手动连接后重试。', 'error');
                     return;
                 }
             } else {
                 return;
             }
         }
-
-        const amountInput = document.getElementById('token-exchange-amount');
-        if (!amountInput) {
-            this.showResultMessage('找不到兑换数量输入框', 'error');
+        
+        // Use calculated values for checks from this.updateCalculation()
+        if (parseFloat(inputValueString) <= 0 || !this.calculatedGrossTokensWei || this.calculatedGrossTokensWei <= BigInt(0)) {
+            this.showResultMessage('请输入有效的兑换数量。', 'error');
+            return;
+        }
+        if (!this.calculatedIsEnoughResources) {
+            this.showResultMessage('资源不足 (金币或代币)，无法完成兑换。', 'error');
+            return;
+        }
+        if (this.calculatedIsBelowMin) {
+            const minAmountInUnit = parseFloat(Web3TokenContract.web3.utils.fromWei(this.config.contractConfig.minExchangeAmountWei.toString(), this.getUnitForDecimals(this.config.contractConfig.tokenDecimals)));
+            this.showResultMessage(`兑换数量低于最小兑换量 ${minAmountInUnit.toLocaleString()} ${this.config.contractConfig.tokenSymbol || '代币'} (税前)。`, 'error');
+            return;
+        }
+        if (this.calculatedIsAboveMax) {
+            const maxAmountInUnit = parseFloat(Web3TokenContract.web3.utils.fromWei(this.config.contractConfig.maxExchangeAmountWei.toString(), this.getUnitForDecimals(this.config.contractConfig.tokenDecimals)));
+            this.showResultMessage(`兑换数量高于最大兑换量 ${maxAmountInUnit.toLocaleString()} ${this.config.contractConfig.tokenSymbol || '代币'} (税前)。`, 'error');
             return;
         }
 
-        // 获取输入的代币数量
-        tokenAmount = amountInput.value === '' ? 0 : parseInt(amountInput.value);
-
-        // 验证兑换数量
-        if (amountInput.value === '' || tokenAmount < this.config.MIN_EXCHANGE_AMOUNT) {
-            this.showResultMessage(`兑换数量不能小于 ${this.config.MIN_EXCHANGE_AMOUNT} ${this.config.TOKEN_NAME}`, 'error');
-            return;
-        }
-
-        if (tokenAmount > this.config.MAX_EXCHANGE_AMOUNT) {
-            this.showResultMessage(`兑换数量不能大于 ${this.config.MAX_EXCHANGE_AMOUNT} ${this.config.TOKEN_NAME}`, 'error');
-            return;
-        }
-
-        // 检查是否使用反向兑换模式
-        let inverseMode = false;
-        if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
-            inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
-        }
-
-        // 计算需要的金币数量 - 与合约中的计算逻辑保持一致
-        let requiredCoins = 0;
-        if (inverseMode) {
-            // 反向模式: 100代币=1金币
-            requiredCoins = tokenAmount / this.config.COINS_PER_TOKEN;
-        } else {
-            // 正常模式: 1000金币=1代币
-            requiredCoins = tokenAmount * this.config.COINS_PER_TOKEN;
-        }
-        const totalCoinsNeeded = requiredCoins;
-
-        // 检查金币是否足够
-        if (this.currentCoins < totalCoinsNeeded) {
-            this.showResultMessage(`金币不足，需要 ${totalCoinsNeeded.toLocaleString()} 金币，当前余额 ${this.currentCoins.toLocaleString()} 金币`, 'error');
-            return;
-        }
-
-        // 显示加载中状态
-        this.showLoading(true);
+        const exchangeButton = document.getElementById('token-exchange-button');
+        if (exchangeButton) exchangeButton.disabled = true; // Disable button early
+        
+        const authoritativeContractMode = this.config.contractConfig.inverseMode;
+        this.showLoading(true, authoritativeContractMode ? "处理兑换..." : "处理充值...");
 
         try {
-            // 使用Web3合约进行兑换
-            if (typeof Web3TokenContract !== 'undefined' && Web3TokenContract.tokenContract) {
-                console.log('使用Web3合约进行代币兑换...');
+            console.log('[DEBUG] TokenExchange.performExchange: Entry - this.calculatedGameCoinsInvolved:', this.calculatedGameCoinsInvolved ? this.calculatedGameCoinsInvolved.toString() : 'undefined');
+            console.log('[DEBUG] TokenExchange.performExchange: Entry - this.calculatedNetTokensWei:', this.calculatedNetTokensWei ? this.calculatedNetTokensWei.toString() : 'undefined');
+            const nonce = generateNonce(); // Ensure this function is globally available or defined within TokenExchange
+            let signatureData;
+            let exchangeResult;
+            
+            // These are the values that will be sent to the server for signing
+            // AND to the smart contract. They are derived from the `this.calculated...` properties.
+            let gameCoins_str;
+            let tokensWei_str; // This will be NET for coin->token, GROSS for token->coin
 
-                // 获取游戏金币数据
-                gameCoinsToUse = totalCoinsNeeded;
-
-                console.log('兑换参数:');
-                console.log('- 玩家地址:', this.walletAddress);
-                console.log('- 代币数量:', tokenAmount);
-                console.log('- 游戏金币数量:', gameCoinsToUse);
-
-                // 使用签名验证兑换
-                try {
-                    // 获取签名数据
-                    if (typeof ApiService !== 'undefined') {
-                        try {
-                            console.log('准备获取交易签名...');
-                            console.log('- 钱包地址:', this.walletAddress);
-                            console.log('- 代币数量:', tokenAmount);
-                            console.log('- 游戏金币:', gameCoinsToUse);
-
-                            // 检查是否使用反向兑换模式
-                            let inverseMode = false;
-                            if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
-                                inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
-                            }
-
-                            console.log('- 反向兑换模式:', inverseMode);
-
-                            // 获取合约地址
-                            let contractAddressToUse = '';
-                            if (typeof Web3Config !== 'undefined' && Web3Config.BRIDGE_CONTRACT && Web3Config.BRIDGE_CONTRACT.ADDRESS) {
-                                contractAddressToUse = Web3Config.BRIDGE_CONTRACT.ADDRESS;
-                            } else if (typeof GameConfig !== 'undefined' && GameConfig.TOKEN_EXCHANGE && GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS) {
-                                // 保留 GameConfig 作为备用，但优先使用 Web3Config
-                                contractAddressToUse = GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS;
-                                console.warn('使用的是 GameConfig 中的合约地址作为备选:', contractAddressToUse);
-                            } else {
-                                console.error('错误：无法在 Web3Config 或 GameConfig 中找到有效的合约地址！');
-                                throw new Error('合约地址未配置，无法进行签名');
-                            }
-                            console.log('ApiService.getExchangeSignature 将使用的合约地址:', contractAddressToUse);
-
-                            // 从API获取签名
-                            signatureData = await ApiService.getExchangeSignature(
-                                this.walletAddress,    // playerAddress
-                                tokenAmount,           // tokenAmount
-                                gameCoinsToUse,        // gameCoins
-                                contractAddressToUse,  // contractAddress - 使用从 Web3Config 获取的地址
-                                inverseMode            // isInverse - 正确传递
-                            );
-
-                            if (!signatureData || !signatureData.success) {
-                                console.error('获取签名失败:', signatureData);
-                                throw new Error(signatureData?.error || '获取签名失败');
-                            }
-
-                            console.log('获取到交易签名:', signatureData);
-                            console.log('- Nonce:', signatureData.nonce);
-                            console.log('- 签名:', signatureData.signature);
-                            console.log('- 签名长度:', signatureData.signature.length);
-                            console.log('- 签名者:', signatureData.signer);
-                        } catch (signError) {
-                            console.error('获取交易签名失败:', signError);
-                            throw new Error('获取交易签名失败，请稍后重试');
-                        }
-                    } else {
-                        throw new Error('ApiService不可用，无法获取交易签名');
-                    }
-
-                    // 获取合约地址
-                    let contractAddress = '';
-                    if (typeof GameConfig !== 'undefined' &&
-                        GameConfig.TOKEN_EXCHANGE &&
-                        GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS) {
-                        contractAddress = GameConfig.TOKEN_EXCHANGE.CONTRACT_ADDRESS;
-                        console.log('使用的合约地址:', contractAddress);
-                    } else {
-                        console.warn('未找到合约地址配置，将使用默认值');
-                    }
-
-                    // 调用Web3TokenContract的exchangeCoinsForTokens方法
-                    console.log('准备调用合约方法...');
-                    console.log('- 代币数量:', tokenAmount);
-                    console.log('- 游戏金币:', gameCoinsToUse);
-                    console.log('- Nonce:', signatureData.nonce);
-                    console.log('- 签名长度:', signatureData.signature.length);
-
-                    // 检查是否使用反向兑换模式
-                    let inverseMode = false;
-                    if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
-                        inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
-                    }
-
-                    // 在反向兑换模式下，需要调整代币数量
-                    // 因为合约期望的是wei单位，但前端显示的是代币单位
-                    // 在反向模式下，我们需要将代币数量转换为正确的wei单位
-                    let adjustedTokenAmount = tokenAmount;
-                    if (inverseMode) {
-                        // 在反向兑换模式下，合约从合约所有者转移代币到玩家
-                        // 玩家不需要支付代币，而是支付游戏金币
-                        // 所以这里不需要调整代币数量，直接使用前端计算的代币数量即可
-                        console.log('反向兑换模式 - 使用原始代币数量:', adjustedTokenAmount);
-                    }
-
-                    const exchangeResult = await Web3TokenContract.exchangeCoinsForTokensWithSignature(
-                        adjustedTokenAmount,
-                        gameCoinsToUse,
-                        signatureData.nonce,
-                        signatureData.signature
-                    );
-
-                    if (!exchangeResult.success) {
-                        throw new Error(exchangeResult.error || '兑换失败，请稍后重试');
-                    }
-
-                    // 获取交易结果
-                    const tx = exchangeResult.data;
-
-                    console.log('兑换交易已提交:', tx);
-
-                    // 兑换成功
-                    this.showResultMessage(`成功兑换 ${tokenAmount} ${this.config.TOKEN_NAME}`, 'success');
-
-                    // 更新余额信息
-                    await this.updateBalances();
-
-                    // 更新计算结果
-                    this.updateCalculation();
-
-                    // 注意：金币已经在后端的/api/sign-exchange端点中被扣除，不需要在前端再次扣除
-                } catch (contractError) {
-                    console.error('合约交互失败:', contractError);
-
-                    let errorMessage = '兑换失败，请稍后重试';
-
-                    // 解析错误消息
-                    if (contractError.message.includes('user rejected transaction')) {
-                        errorMessage = '用户取消了交易';
-
-                        // 用户取消交易，调用API退还金币
-                        if (typeof ApiService !== 'undefined' && signatureData && signatureData.nonce) {
-                            try {
-                                console.log('用户取消交易，尝试退还金币...');
-                                console.log('- 玩家地址:', this.walletAddress);
-                                console.log('- 代币数量:', tokenAmount);
-                                console.log('- 游戏金币:', gameCoinsToUse);
-                                console.log('- Nonce:', signatureData.nonce);
-
-                                // 检查是否使用反向兑换模式
-                                let inverseMode = false;
-                                if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
-                                    inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
-                                }
-
-                                console.log('- 反向兑换模式:', inverseMode);
-
-                                const cancelResult = await ApiService.cancelExchange(
-                                    this.walletAddress,
-                                    tokenAmount,
-                                    gameCoinsToUse,
-                                    signatureData.nonce,
-                                    inverseMode  // 添加反向模式参数
-                                );
-
-                                if (cancelResult.success) {
-                                    console.log('金币退还成功:', cancelResult);
-                                    errorMessage = '用户取消了交易，金币已退还';
-
-                                    // 更新余额信息
-                                    await this.updateBalances();
-
-                                    // 更新计算结果
-                                    this.updateCalculation();
-                                } else {
-                                    console.error('金币退还失败:', cancelResult.error);
-                                    errorMessage = '用户取消了交易，但金币退还失败，请联系客服';
-                                }
-                            } catch (cancelError) {
-                                console.error('退还金币时出错:', cancelError);
-                                errorMessage = '用户取消了交易，但金币退还失败，请联系客服';
-                            }
-                        } else {
-                            console.warn('无法退还金币，ApiService不可用或签名数据不完整');
-                            errorMessage = '用户取消了交易，但无法自动退还金币，请联系客服';
-                        }
-                    } else if (contractError.message.includes('insufficient funds')) {
-                        errorMessage = 'Gas费用不足，请确保您的钱包中有足够的BNB';
-
-                        // Gas费不足，也需要退还金币
-                        if (typeof ApiService !== 'undefined' && signatureData && signatureData.nonce) {
-                            try {
-                                console.log('Gas费不足，尝试退还金币...');
-
-                                // 检查是否使用反向兑换模式
-                                let inverseMode = false;
-                                if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
-                                    inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
-                                }
-
-                                console.log('- 反向兑换模式:', inverseMode);
-
-                                const cancelResult = await ApiService.cancelExchange(
-                                    this.walletAddress,
-                                    tokenAmount,
-                                    gameCoinsToUse,
-                                    signatureData.nonce,
-                                    inverseMode  // 添加反向模式参数
-                                );
-
-                                if (cancelResult.success) {
-                                    console.log('金币退还成功:', cancelResult);
-                                    errorMessage = 'Gas费用不足，交易已取消，金币已退还';
-
-                                    // 更新余额信息
-                                    await this.updateBalances();
-
-                                    // 更新计算结果
-                                    this.updateCalculation();
-                                } else {
-                                    console.error('金币退还失败:', cancelResult.error);
-                                    errorMessage = 'Gas费用不足，交易已取消，但金币退还失败，请联系客服';
-                                }
-                            } catch (cancelError) {
-                                console.error('退还金币时出错:', cancelError);
-                                errorMessage = 'Gas费用不足，交易已取消，但金币退还失败，请联系客服';
-                            }
-                        }
-                    } else if (contractError.message.includes('execution reverted')) {
-                        // 尝试提取合约错误消息
-                        const revertReason = contractError.message.match(/reason string: '(.+?)'/);
-                        if (revertReason && revertReason[1]) {
-                            errorMessage = `合约执行失败: ${revertReason[1]}`;
-                        }
-
-                        // 合约执行失败，也需要退还金币
-                        if (typeof ApiService !== 'undefined' && signatureData && signatureData.nonce) {
-                            try {
-                                console.log('合约执行失败，尝试退还金币...');
-
-                                // 检查是否使用反向兑换模式
-                                let inverseMode = false;
-                                if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
-                                    inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
-                                }
-
-                                console.log('- 反向兑换模式:', inverseMode);
-
-                                const cancelResult = await ApiService.cancelExchange(
-                                    this.walletAddress,
-                                    tokenAmount,
-                                    gameCoinsToUse,
-                                    signatureData.nonce,
-                                    inverseMode  // 添加反向模式参数
-                                );
-
-                                if (cancelResult.success) {
-                                    console.log('金币退还成功:', cancelResult);
-                                    errorMessage += '，金币已退还';
-
-                                    // 更新余额信息
-                                    await this.updateBalances();
-
-                                    // 更新计算结果
-                                    this.updateCalculation();
-                                } else {
-                                    console.error('金币退还失败:', cancelResult.error);
-                                    errorMessage += '，但金币退还失败，请联系客服';
-                                }
-                            } catch (cancelError) {
-                                console.error('退还金币时出错:', cancelError);
-                                errorMessage += '，但金币退还失败，请联系客服';
-                            }
-                        }
-                    } else if (contractError.message.includes('nonce already used')) {
-                        errorMessage = '交易已被处理，请刷新页面后重试';
-                    } else if (contractError.message.includes('invalid signature')) {
-                        errorMessage = '签名验证失败，请刷新页面后重试';
-
-                        // 签名验证失败，也需要退还金币
-                        if (typeof ApiService !== 'undefined' && signatureData && signatureData.nonce) {
-                            try {
-                                console.log('签名验证失败，尝试退还金币...');
-
-                                // 检查是否使用反向兑换模式
-                                let inverseMode = false;
-                                if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
-                                    inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
-                                }
-
-                                console.log('- 反向兑换模式:', inverseMode);
-
-                                const cancelResult = await ApiService.cancelExchange(
-                                    this.walletAddress,
-                                    tokenAmount,
-                                    gameCoinsToUse,
-                                    signatureData.nonce,
-                                    inverseMode  // 添加反向模式参数
-                                );
-
-                                if (cancelResult.success) {
-                                    console.log('金币退还成功:', cancelResult);
-                                    errorMessage = '签名验证失败，交易已取消，金币已退还';
-
-                                    // 更新余额信息
-                                    await this.updateBalances();
-
-                                    // 更新计算结果
-                                    this.updateCalculation();
-                                } else {
-                                    console.error('金币退还失败:', cancelResult.error);
-                                    errorMessage = '签名验证失败，交易已取消，但金币退还失败，请联系客服';
-                                }
-                            } catch (cancelError) {
-                                console.error('退还金币时出错:', cancelError);
-                                errorMessage = '签名验证失败，交易已取消，但金币退还失败，请联系客服';
-                            }
-                        }
-                    } else {
-                        // 其他错误，也尝试退还金币
-                        if (typeof ApiService !== 'undefined' && signatureData && signatureData.nonce) {
-                            try {
-                                console.log('交易失败，尝试退还金币...');
-
-                                // 检查是否使用反向兑换模式
-                                let inverseMode = false;
-                                if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
-                                    inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
-                                }
-
-                                console.log('- 反向兑换模式:', inverseMode);
-
-                                const cancelResult = await ApiService.cancelExchange(
-                                    this.walletAddress,
-                                    tokenAmount,
-                                    gameCoinsToUse,
-                                    signatureData.nonce,
-                                    inverseMode  // 添加反向模式参数
-                                );
-
-                                if (cancelResult.success) {
-                                    console.log('金币退还成功:', cancelResult);
-                                    errorMessage += '，金币已退还';
-
-                                    // 更新余额信息
-                                    await this.updateBalances();
-
-                                    // 更新计算结果
-                                    this.updateCalculation();
-                                } else {
-                                    console.error('金币退还失败:', cancelResult.error);
-                                    errorMessage += '，但金币退还失败，请联系客服';
-                                }
-                            } catch (cancelError) {
-                                console.error('退还金币时出错:', cancelError);
-                                errorMessage += '，但金币退还失败，请联系客服';
-                            }
-                        }
-                    }
-
-                    this.showResultMessage(errorMessage, 'error');
-                }
-            } else {
-                this.showResultMessage('Web3合约不可用，无法执行兑换', 'error');
+            if (authoritativeContractMode) { // 金币兑换代币 (user inputs game coins, receives net tokens)
+                gameCoins_str = this.calculatedGameCoinsInvolved.toString();
+                tokensWei_str = this.calculatedNetTokensWei.toString(); // Server expects NET, contract's exchangeFromGame expects NET
+            } else { // 代币兑换金币 (user inputs gross tokens, receives game coins)
+                tokensWei_str = this.calculatedGrossTokensWei.toString(); // Server expects GROSS, contract's rechargeToGame expects GROSS
+                gameCoins_str = this.calculatedGameCoinsInvolved.toString();
             }
-        } catch (error) {
-            console.error('执行兑换出错:', error);
-            console.error('错误类型:', typeof error);
-            console.error('错误消息:', error.message);
-            console.error('错误详情:', JSON.stringify(error, null, 2));
+            
+            console.log('TokenExchange.performExchange: 准备请求签名参数:', {
+                playerAddress: this.walletAddress,
+                tokenAmountForSignOrContract: tokensWei_str, 
+                gameCoinsForSignOrContract: gameCoins_str,    
+                nonce: nonce,
+                isInverseForSign: authoritativeContractMode 
+            });
 
-            // 检查错误是否包含用户取消交易的信息
-            if ((error.originalError && error.originalError.includes('user rejected transaction')) ||
-                (error.message && error.message.includes('user rejected transaction')) ||
-                (error.message && error.message.includes('User denied transaction')) ||
-                (error.message && error.message.includes('MetaMask Tx Signature: User denied'))) {
-                console.log('用户取消了交易，尝试退还金币...');
+            const contractAddr = this.config.contractConfig.contractAddress;
+            if (!contractAddr || (typeof Web3TokenContract !== 'undefined' && Web3TokenContract.web3 && Web3TokenContract.web3.utils && !Web3TokenContract.web3.utils.isAddress(contractAddr))) {
+                console.error("TokenExchange.performExchange: Invalid or missing contract address from config:", contractAddr);
+                this.showResultMessage('配置错误：合约地址无效或缺失', 'error');
+                this.showLoading(false);
+                if (exchangeButton) exchangeButton.disabled = false;
+                return;
+            }
+            signatureData = await ApiService.getExchangeSignature(
+                this.walletAddress,
+                tokensWei_str, // Pass the wei string directly
+                gameCoins_str, // Pass the coin string directly
+                contractAddr,  // Pass the correct contract address
+                authoritativeContractMode
+            );
 
-                // 用户取消交易，调用API退还金币
-                console.log('检查signatureData:', signatureData);
+            if (!signatureData || !signatureData.signature) { 
+                throw new Error(signatureData?.error || "获取服务器签名失败。");
+            }
+            console.log('TokenExchange.performExchange: 获取到交易签名:', signatureData);
+            
+            if (authoritativeContractMode) { // 金币兑换代币
+                 console.log('TokenExchange.performExchange: 调用 exchangeCoinsForTokensWithSignature with:', {
+                    gameCoins: gameCoins_str,
+                    tokenAmountNetWei: tokensWei_str, // NET
+                    nonce: signatureData.nonce, // Use nonce from server response
+                    signature: signatureData.signature
+                });
+                exchangeResult = await Web3TokenContract.exchangeCoinsForTokensWithSignature(
+                    gameCoins_str,
+                    tokensWei_str,
+                    signatureData.nonce,
+                    authoritativeContractMode, // Pass the isInverse mode
+                    signatureData.signature
+                );
+            } else { // 代币兑换金币
+                console.log('TokenExchange.performExchange: 调用 rechargeTokensForCoinsWithSignature with:', {
+                    tokenAmountGrossWei: tokensWei_str, // GROSS
+                    gameCoinsToReceive: gameCoins_str,
+                    nonce: signatureData.nonce, // Use nonce from server response
+                    signature: signatureData.signature
+                });
+                exchangeResult = await Web3TokenContract.rechargeTokensForCoinsWithSignature(
+                    tokensWei_str,     
+                    gameCoins_str,       
+                    signatureData.nonce,            
+                    signatureData.signature
+                );
+            }
 
-                if (typeof ApiService !== 'undefined' && signatureData && signatureData.nonce) {
-                    try {
-                        console.log('用户取消交易，尝试退还金币...');
-                        console.log('- 玩家地址:', this.walletAddress);
-                        console.log('- 代币数量:', tokenAmount);
-                        console.log('- 游戏金币:', gameCoinsToUse);
-                        console.log('- Nonce:', signatureData.nonce);
+            if (!exchangeResult || !exchangeResult.success) {
+                throw new Error(exchangeResult?.error || (authoritativeContractMode ? '兑换失败' : '充值失败'));
+            }
 
-                        // 检查是否使用反向兑换模式
-                        let inverseMode = false;
-                        if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
-                            inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
-                        }
+            const tx = exchangeResult.data; 
+            console.log('TokenExchange.performExchange: 交易已提交:', tx.transactionHash);
 
-                        console.log('- 反向兑换模式:', inverseMode);
+            if (tx && tx.transactionHash) {
+                // For confirmation, use the same amounts that were signed
+                const confirmApiResult = await ApiService.confirmExchangeOnServer(
+                    this.walletAddress,
+                    tokensWei_str, 
+                    gameCoins_str, 
+                    signatureData.nonce, 
+                    tx.transactionHash, 
+                    authoritativeContractMode 
+                );
 
-                        const cancelResult = await ApiService.cancelExchange(
-                            this.walletAddress,
-                            tokenAmount,
-                            gameCoinsToUse,
-                            signatureData.nonce,
-                            inverseMode  // 添加反向模式参数
-                        );
-
-                        if (cancelResult.success) {
-                            console.log('金币退还成功:', cancelResult);
-                            this.showResultMessage('用户取消了交易，金币已退还', 'error');
-
-                            // 更新余额信息
-                            await this.updateBalances();
-
-                            // 更新计算结果
-                            this.updateCalculation();
-                        } else {
-                            console.error('金币退还失败:', cancelResult.error);
-                            this.showResultMessage('用户取消了交易，但金币退还失败，请联系客服', 'error');
-                        }
-                    } catch (cancelError) {
-                        console.error('退还金币时出错:', cancelError);
-                        this.showResultMessage('用户取消了交易，但金币退还失败，请联系客服', 'error');
-                    }
+                if (confirmApiResult && confirmApiResult.success) {
+                    this.showResultMessage(confirmApiResult.message || `${authoritativeContractMode ? '兑换' : '充值'}成功 (已确认)`, 'success');
                 } else {
-                    console.warn('无法退还金币，ApiService不可用或签名数据不完整');
-                    console.warn('ApiService可用:', typeof ApiService !== 'undefined');
-                    console.warn('signatureData:', signatureData);
-                    console.warn('tokenAmount:', tokenAmount);
-                    console.warn('gameCoinsToUse:', gameCoinsToUse);
-
-                    this.showResultMessage('用户取消了交易，但无法自动退还金币，请联系客服', 'error');
+                    let confirmErrorMsg = `交易已在链上提交，但服务器确认失败。请检查您的余额。`;
+                    if (confirmApiResult?.error) confirmErrorMsg += ` 服务器错误: ${confirmApiResult.error}`;
+                    if (confirmApiResult?.failureReason) confirmErrorMsg += ` 失败原因: ${confirmApiResult.failureReason}`;
+                    if (confirmApiResult?.coinsRefunded > 0) confirmErrorMsg += ` 已退还金币: ${confirmApiResult.coinsRefunded}`;
+                    this.showResultMessage(confirmErrorMsg, 'warning');
                 }
             } else {
-                this.showResultMessage('兑换过程中发生错误，请稍后重试', 'error');
+                 this.showResultMessage('交易已在链上提交，但无法获取交易详情以供服务器确认。请检查余额。', 'warning');
             }
+
+            await this.updateBalances(); 
+            this.updateCalculation(); // Recalculate to reflect new balances and potentially clear input or show new state    
+
+        } catch (error) {
+            console.error(`TokenExchange.performExchange: ${authoritativeContractMode ? '兑换' : '充值'}过程中出错:`, error);
+            let errorMessage = error.message || `${authoritativeContractMode ? '兑换' : '充值'}失败，请稍后重试`;
+            if (error.code === 4001 || (error.message && (error.message.toLowerCase().includes('user rejected transaction') || error.message.toLowerCase().includes('user denied transaction')))) { 
+                errorMessage = '您已取消交易。';
+                 // Attempt to cancel/refund with backend if signature was obtained
+                if (signatureData && signatureData.nonce && ApiService && ApiService.cancelExchange) {
+                    try {
+                        console.log("User cancelled, attempting to inform backend to cancel/refund...");
+                        await ApiService.cancelExchange(
+                            this.walletAddress, tokensWei_str, gameCoins_str, // Use the same amounts
+                            signatureData.nonce, authoritativeContractMode
+                        );
+                        errorMessage += ' 已通知服务器尝试取消。';
+                        await this.updateBalances(); 
+                        this.updateCalculation();
+                    } catch (cancelError) {
+                        console.error('TokenExchange.performExchange: 调用cancelExchange失败:', cancelError);
+                        errorMessage += ' 通知服务器取消失败。';
+                    }
+                }
+            } else if (error.message && error.message.toLowerCase().includes('insufficient funds')) {
+                errorMessage = '您的钱包余额不足以支付交易费用 (Gas)。';
+            }
+            this.showResultMessage(errorMessage, 'error');
         } finally {
-            // 隐藏加载中状态
             this.showLoading(false);
+            if (exchangeButton) exchangeButton.disabled = false; // Re-enable button
+            // It's good practice to call updateCalculation here to ensure UI is consistent
+            // especially if the input field might need to be reset or re-validated based on new balances.
+            this.updateCalculation(); 
         }
     },
 
@@ -1548,61 +1513,125 @@ const TokenExchange = {
 
     // 更新代币税率UI
     updateTaxRateUI: function() {
-        console.log('更新代币税率UI');
-
-        // 查找代币税信息元素
+        console.log('TokenExchange.updateTaxRateUI: 更新代币税率UI (回滚后)');
         const taxInfo = document.getElementById('token-exchange-tax-info');
         if (taxInfo) {
-            taxInfo.innerHTML = `代币税: <strong>${this.config.TOKEN_TAX_PERCENT}%</strong>`;
-            console.log('代币税率UI已更新');
+            // TOKEN_TAX_PERCENT 是从 Web3Config.EXCHANGE.TAX_RATE (BPS) / 100 计算得到的百分比
+            // Display a 10% tax for UI purposes, actual server tax is 0%.
+            const nominalTaxPercent = parseFloat(this.config.TOKEN_TAX_PERCENT) || 0;
+            taxInfo.innerHTML = `代币税: <strong>${nominalTaxPercent.toFixed(2)}%</strong>`;
         } else {
-            console.warn('找不到代币税率UI元素');
+            console.warn('TokenExchange.updateTaxRateUI: 找不到代币税率UI元素');
         }
     },
 
     // 更新兑换比例UI
     updateRateUI: function() {
-        console.log('更新兑换比例UI');
-
-        // 查找兑换比例信息元素
+        console.log('TokenExchange.updateRateUI: 更新兑换比例UI (回滚后)');
         const rateInfo = document.getElementById('token-exchange-rate-info');
         if (rateInfo) {
-            // 检查是否使用反向兑换模式
-            let inverseMode = false;
-            if (typeof Web3Config !== 'undefined' && Web3Config.EXCHANGE && Web3Config.EXCHANGE.INVERSE_MODE !== undefined) {
-                inverseMode = Web3Config.EXCHANGE.INVERSE_MODE;
-            }
+            const inverseMode = this.config.contractConfig && typeof this.config.contractConfig.inverseMode === 'boolean'
+                                ? this.config.contractConfig.inverseMode
+                                : null; // Default to null if not set, to show loading
 
-            if (inverseMode) {
-                // 反向模式: 100代币=1金币
-                rateInfo.innerHTML = `兑换比例: <strong>${this.config.COINS_PER_TOKEN}</strong> ${this.config.TOKEN_NAME} = <strong>1</strong> 金币`;
-            } else {
-                // 正常模式: 1000金币=1代币
-                rateInfo.innerHTML = `兑换比例: <strong>${this.config.COINS_PER_TOKEN}</strong> 金币 = <strong>1</strong> ${this.config.TOKEN_NAME}`;
+            const coinsPerToken = parseFloat(this.config.COINS_PER_TOKEN);
+            const tokenSymbol = this.config.TOKEN_NAME || (this.config.contractConfig && this.config.contractConfig.tokenSymbol) || '代币';
+
+            if (inverseMode === null || isNaN(coinsPerToken)) {
+                rateInfo.innerHTML = `兑换比例: <strong>加载中...</strong>`;
+                return;
             }
-            console.log('兑换比例UI已更新，反向模式:', inverseMode);
+            
+            const rateDisplayValue = coinsPerToken; // COINS_PER_TOKEN is X金币 = 1代币单位
+
+            if (inverseMode) { // 金币兑换代币 (inverseMode=true in contract, user wants tokens)
+                               // User wants "1 Game Coin = X Tokens"
+                const tokensPerCoin = rateDisplayValue;
+                rateInfo.innerHTML = `兑换比例: <strong>1</strong> 游戏金币 = <strong>${tokensPerCoin.toLocaleString()}</strong> ${tokenSymbol}`;
+            } else { // 代币兑换金币 (inverseMode=false in contract, user wants game coins)
+                     // We display the rate as "1 TOKEN = X 金币" (This part remains as is, as it's already 1 TOKEN = X GC)
+                rateInfo.innerHTML = `兑换比例: <strong>1</strong> ${tokenSymbol} = <strong>${rateDisplayValue.toLocaleString()}</strong> 金币`;
+            }
         } else {
-            console.warn('找不到兑换比例UI元素');
+            console.warn('TokenExchange.updateRateUI: 找不到兑换比例UI元素');
+        }
+    },
+    
+    updateInputLabelsAndPlaceholders: function() {
+        console.log('TokenExchange.updateInputLabelsAndPlaceholders: 更新输入框标签和占位符');
+        const inputLabel = document.getElementById('token-exchange-input-label');
+        const amountInput = document.getElementById('token-exchange-amount');
+        const unitLabel = document.getElementById('token-exchange-input-unit');
+        const exchangeButton = document.getElementById('token-exchange-button');
+        const titleElement = document.querySelector('#token-exchange-panel h2');
+
+
+        if (!inputLabel || !amountInput || !unitLabel || !exchangeButton || !titleElement) {
+            console.warn("TokenExchange.updateInputLabelsAndPlaceholders: 部分UI元素未找到。");
+            return;
+        }
+
+        const contractMode = this.config.contractConfig.inverseMode;
+        const tokenSymbol = this.config.contractConfig.tokenSymbol || this.config.TOKEN_NAME;
+        const minAmountDisplay = this.config.MIN_EXCHANGE_AMOUNT || 1;
+
+
+        if (contractMode === null) {
+            inputLabel.textContent = '数量:';
+            amountInput.placeholder = `最小: ${minAmountDisplay}`;
+            unitLabel.textContent = '...';
+            exchangeButton.textContent = '加载中';
+            titleElement.textContent = '代币管理';
+            return;
+        }
+
+        if (contractMode) { // coin->token (inverseMode=true in contract)
+            titleElement.textContent = '金币兑换代币';
+            inputLabel.textContent = `兑换金币:`;
+            unitLabel.textContent = "个";
+            amountInput.placeholder = `最少 ${minAmountDisplay} ${tokenSymbol}`;
+            exchangeButton.textContent = '兑换';
+        } else { // token->coin (inverseMode=false in contract)
+            titleElement.textContent = '代币充值金币';
+            inputLabel.textContent = `支付 ${tokenSymbol}:`;
+            unitLabel.textContent = tokenSymbol;
+            amountInput.placeholder = `最少 ${minAmountDisplay} ${tokenSymbol}`;
+            exchangeButton.textContent = '充值';
+        }
+    },
+
+    updateTokenNameInUI: function(tokenName) {
+        console.log(`TokenExchange.updateTokenNameInUI: 更新UI中的代币名称为 ${tokenName}`);
+        const unitLabels = document.querySelectorAll('.token-unit-label');
+        unitLabels.forEach(label => {
+            label.textContent = tokenName;
+        });
+        // Also update the main token balance label if it's separate
+        const tokensBalanceLabel = document.querySelector('#token-exchange-tokens-balance');
+        if (tokensBalanceLabel && tokensBalanceLabel.firstChild && tokensBalanceLabel.firstChild.nodeType === Node.TEXT_NODE) {
+            // This is a bit fragile, assumes "TOKEN_NAME 余额:" structure
+            // A better way would be to have a dedicated span for the token name part of the balance label.
+            // For now, if the structure is `<p>TOKEN_NAME 余额: <span>0</span></p>`, we update the first part.
+            // The current HTML is `<span class="token-unit-label">TWB</span> 余额: <span>0</span>` which is handled by .token-unit-label
         }
     },
 
     // 显示/隐藏加载中状态
-    showLoading: function(show) {
+    showLoading: function(show, message = '处理中...') {
         const exchangeButton = document.getElementById('token-exchange-button');
         if (exchangeButton) {
             if (show) {
-                exchangeButton.textContent = '处理中...';
+                exchangeButton.textContent = message;
                 exchangeButton.disabled = true;
                 exchangeButton.style.opacity = '0.7';
                 exchangeButton.style.cursor = 'not-allowed';
             } else {
-                exchangeButton.textContent = '兑换';
-                exchangeButton.disabled = false;
+                // Text content will be reset by updateInputLabelsAndPlaceholders or updateCalculation
+                // exchangeButton.textContent = '兑换'; // Or '充值' based on mode
+                exchangeButton.disabled = false; // Will be re-evaluated by updateCalculation
                 exchangeButton.style.opacity = '1';
                 exchangeButton.style.cursor = 'pointer';
-
-                // 更新计算结果会重新设置按钮状态
-                this.updateCalculation();
+                this.updateCalculation(); // Recalculate to set correct button state and text
             }
         }
     },
@@ -1627,20 +1656,28 @@ const TokenExchange = {
         }
 
         // 添加或更新最小兑换金额提示
-        const exchangeContainer = document.getElementById('token-exchange-panel');
-        if (exchangeContainer) {
+        const exchangeForm = document.getElementById('exchange-form'); // Target the form
+        if (exchangeForm) { // Check if the form exists
             let minAmountTip = document.getElementById('min-exchange-amount-tip');
             if (!minAmountTip) {
-                // 创建提示元素
                 minAmountTip = document.createElement('div');
                 minAmountTip.id = 'min-exchange-amount-tip';
 
-                // 查找合适的位置插入提示
-                const rateInfo = document.querySelector('#token-exchange-panel p');
-                if (rateInfo) {
-                    exchangeContainer.insertBefore(minAmountTip, rateInfo.nextSibling);
+                const taxInfoElement = document.getElementById('token-exchange-tax-info');
+                if (taxInfoElement && taxInfoElement.parentNode === exchangeForm) {
+                    // Insert after taxInfoElement if it exists and is a child of exchangeForm
+                    exchangeForm.insertBefore(minAmountTip, taxInfoElement.nextSibling);
                 } else {
-                    exchangeContainer.appendChild(minAmountTip);
+                    // Fallback: if taxInfoElement is not found or has a different parent,
+                    // try to insert it after rateInfoElement, or append to the form.
+                    const rateInfoElement = document.getElementById('token-exchange-rate-info');
+                    if (rateInfoElement && rateInfoElement.parentNode === exchangeForm) {
+                         exchangeForm.insertBefore(minAmountTip, rateInfoElement.nextSibling);
+                    } else {
+                        // As a last resort, append to the form.
+                        console.warn('TokenExchange.updateMinExchangeAmountUI: Could not find optimal insertion point for minAmountTip, appending to form.');
+                        exchangeForm.appendChild(minAmountTip);
+                    }
                 }
             }
 
