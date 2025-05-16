@@ -1226,6 +1226,88 @@ app.get('/api/user/:walletAddress/exchange-history', (req, res) => {
 });
 
 /**
+ * 获取提现记录
+ * GET /api/user/:walletAddress/withdrawal-history
+ */
+app.get('/api/user/:walletAddress/withdrawal-history', (req, res) => {
+    const { walletAddress } = req.params;
+
+    // 验证钱包地址格式
+    if (!isValidWalletAddress(walletAddress)) {
+        return res.status(400).json({ error: '无效的钱包地址格式' });
+    }
+
+    const filePath = getUserDataPath(walletAddress);
+
+    try {
+        // 检查用户数据是否存在
+        if (!fs.existsSync(filePath)) {
+            return res.status(200).json({ history: [] });
+        }
+
+        // 读取用户数据
+        const userData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+        // 确保exchangeHistory存在
+        userData.exchangeHistory = userData.exchangeHistory || [];
+
+        // 过滤出已完成的提现记录
+        const withdrawalHistory = userData.exchangeHistory.filter(record =>
+            record.status === 'completed' && record.coinsDeducted === true
+        );
+
+        // 返回提现历史
+        res.status(200).json({
+            history: withdrawalHistory
+        });
+    } catch (error) {
+        console.error(`获取提现记录出错: ${error.message}`);
+        res.status(500).json({ error: '获取提现记录时出错' });
+    }
+});
+
+/**
+ * 获取充值记录
+ * GET /api/user/:walletAddress/recharge-history
+ */
+app.get('/api/user/:walletAddress/recharge-history', (req, res) => {
+    const { walletAddress } = req.params;
+
+    // 验证钱包地址格式
+    if (!isValidWalletAddress(walletAddress)) {
+        return res.status(400).json({ error: '无效的钱包地址格式' });
+    }
+
+    const filePath = getUserDataPath(walletAddress);
+
+    try {
+        // 检查用户数据是否存在
+        if (!fs.existsSync(filePath)) {
+            return res.status(200).json({ history: [] });
+        }
+
+        // 读取用户数据
+        const userData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+        // 确保rechargeHistory存在
+        userData.rechargeHistory = userData.rechargeHistory || [];
+
+        // 过滤出已完成的充值记录
+        const completedRechargeHistory = userData.rechargeHistory.filter(record =>
+            record.status === 'completed'
+        );
+
+        // 返回充值历史
+        res.status(200).json({
+            history: completedRechargeHistory
+        });
+    } catch (error) {
+        console.error(`获取充值记录出错: ${error.message}`);
+        res.status(500).json({ error: '获取充值记录时出错' });
+    }
+});
+
+/**
  * 取消兑换，退还金币 (重写后的版本)
  * POST /api/cancel-exchange
  * 请求体: { playerAddress, nonce, reason, txHash (optional) }
@@ -1393,6 +1475,19 @@ app.post('/api/cancel-exchange', async (req, res) => {
         exchangeRecord.cancelReason = reason;
         exchangeRecord.cancelledAt = new Date().toISOString();
         exchangeRecord.coinsUnlocked = true;
+
+        // 更新提现记录状态
+        userData.withdrawalHistory = userData.withdrawalHistory || [];
+        const withdrawalIndex = userData.withdrawalHistory.findIndex(record =>
+            record.nonce === nonce && record.status === 'pending'
+        );
+
+        if (withdrawalIndex !== -1) {
+            userData.withdrawalHistory[withdrawalIndex].status = 'cancelled';
+            userData.withdrawalHistory[withdrawalIndex].cancelReason = reason;
+            userData.withdrawalHistory[withdrawalIndex].cancelledAt = new Date().toISOString();
+            console.log(`[cancel-exchange] 更新提现记录状态为已取消: Nonce ${nonce}`);
+        }
 
         let failureDetail = `Cancellation for Nonce ${nonce}.`;
         if (txHashToQuery) {
@@ -1967,13 +2062,27 @@ app.post('/api/update-exchange-tx', async (req, res) => {
         exchangeRecord.txHash = txHash;
         exchangeRecord.txUpdatedAt = new Date().toISOString();
 
+        // 添加到提现记录
+        userData.withdrawalHistory = userData.withdrawalHistory || [];
+        const withdrawalRecord = {
+            date: new Date().toISOString(),
+            tokenAmount: exchangeRecord.tokenAmount,
+            gameCoins: exchangeRecord.gameCoins,
+            nonce: exchangeRecord.nonce,
+            txHash: txHash,
+            status: 'pending',
+            playerAddress: playerAddress
+        };
+        userData.withdrawalHistory.push(withdrawalRecord);
+        console.log(`[update-exchange-tx] 添加提现记录:`, withdrawalRecord);
+
         // 保存更新后的数据
         fs.writeFileSync(filePath, JSON.stringify(userData, null, 2));
         console.log(`[update-exchange-tx] 已更新交易哈希: ${txHash} for Nonce: ${nonce}`);
 
         return res.status(200).json({
             success: true,
-            message: '交易哈希已更新',
+            message: '交易哈希已更新，提现记录已添加',
             nonce: nonce,
             txHash: txHash
         });
@@ -2181,6 +2290,36 @@ app.post('/api/confirm-exchange', async (req, res) => {
 
         // 添加一个标记，表示此交易已在链上确认，防止后续通过cancel-exchange解锁金币
         exchangeRecord.onChainConfirmed = true;
+
+        // 更新提现记录状态
+        userData.withdrawalHistory = userData.withdrawalHistory || [];
+        const withdrawalIndex = userData.withdrawalHistory.findIndex(record =>
+            record.nonce === nonce && record.txHash === txHash
+        );
+
+        if (withdrawalIndex !== -1) {
+            userData.withdrawalHistory[withdrawalIndex].status = 'completed';
+            userData.withdrawalHistory[withdrawalIndex].completedAt = new Date().toISOString();
+            userData.withdrawalHistory[withdrawalIndex].coinsDeducted = true;
+            userData.withdrawalHistory[withdrawalIndex].coinsBalanceAfter = userData.coins;
+            console.log(`[confirm-exchange] 更新提现记录状态为已完成: Nonce ${nonce}, TxHash: ${txHash}`);
+        } else {
+            // 如果没有找到对应的提现记录，创建一个新的
+            const withdrawalRecord = {
+                date: new Date().toISOString(),
+                tokenAmount: tokenAmount,
+                gameCoins: gameCoins,
+                nonce: nonce,
+                txHash: txHash,
+                status: 'completed',
+                completedAt: new Date().toISOString(),
+                coinsDeducted: true,
+                coinsBalanceAfter: userData.coins,
+                playerAddress: playerAddress
+            };
+            userData.withdrawalHistory.push(withdrawalRecord);
+            console.log(`[confirm-exchange] 添加新的已完成提现记录:`, withdrawalRecord);
+        }
 
         userData.lastUpdated = new Date().toISOString();
         fs.writeFileSync(filePath, JSON.stringify(userData, null, 2));

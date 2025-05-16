@@ -1116,6 +1116,58 @@ if (typeof window.ApiService === 'undefined') {
             console.error('ApiService: 取消兑换出错:', error);
             return { success: false, error: error.message || '取消兑换时发生客户端错误' };
         }
+    },
+
+    // 获取提现记录
+    getWithdrawalHistory: async function(walletAddress) {
+        if (!walletAddress) {
+            console.error('获取提现记录失败: 钱包地址为空');
+            return [];
+        }
+
+        try {
+            const url = this.buildApiUrl(`/user/${walletAddress}/withdrawal-history`);
+            console.log('获取提现记录URL:', url);
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || '获取提现记录失败');
+            }
+
+            const history = await response.json();
+            console.log('获取提现记录成功:', history);
+            return history;
+        } catch (error) {
+            console.error('获取提现记录出错:', error.message);
+            return [];
+        }
+    },
+
+    // 获取充值记录
+    getRechargeHistory: async function(walletAddress) {
+        if (!walletAddress) {
+            console.error('获取充值记录失败: 钱包地址为空');
+            return [];
+        }
+
+        try {
+            const url = this.buildApiUrl(`/user/${walletAddress}/recharge-history`);
+            console.log('获取充值记录URL:', url);
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || '获取充值记录失败');
+            }
+
+            const history = await response.json();
+            console.log('获取充值记录成功:', history);
+            return history;
+        } catch (error) {
+            console.error('获取充值记录出错:', error.message);
+            return [];
+        }
     } // 这个现在是最后一个方法，所以末尾不需要逗号
   };
 }
