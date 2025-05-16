@@ -7,8 +7,8 @@
 const Web3Config = {
     // 游戏基础配置
     GAME: {
-        START_COST: 0,  // 游戏开始需要扣除的金币数量
-        RESTART_COST: 0,  // 再来一次需要扣除的金币数量
+        START_COST: 200,  // 游戏开始需要扣除的金币数量
+        RESTART_COST: 200,  // 再来一次需要扣除的金币数量
         DEBUG_MODE: false,  // 是否启用调试模式
         USE_API: true,  // 是否使用API
         API_BASE_URL: '/api'  // API基础URL
