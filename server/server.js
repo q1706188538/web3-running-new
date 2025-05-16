@@ -1246,10 +1246,16 @@ app.get('/api/web3-config', (req, res) => {
             const rawConfig = fs.readFileSync(WEB3_CONFIG_FILE_PATH, 'utf8');
             const config = JSON.parse(rawConfig);
             console.log(`[${new Date().toISOString()}] GET /api/web3-config - Served live config from file.`);
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache'); // For HTTP/1.0 backward compatibility
+            res.setHeader('Expires', '0'); // For proxies
             res.status(200).json(config);
         } else {
             // 如果动态配置文件不存在，返回空对象。客户端将使用其内置的默认值。
             console.log(`[${new Date().toISOString()}] GET /api/web3-config - Live config file not found. Client to use defaults.`);
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache'); // For HTTP/1.0 backward compatibility
+            res.setHeader('Expires', '0'); // For proxies
             res.status(200).json({});
         }
     } catch (error) {
@@ -1286,7 +1292,22 @@ app.post('/api/admin/web3-config', (req, res) => {
 // 设置静态文件服务
 // 注意：静态文件服务应该放在所有API路由之后
 // 使用上一级目录（项目根目录）作为静态文件目录
-app.use(express.static(path.join(__dirname, '..')));
+app.use(express.static(path.join(__dirname, '..'), {
+    setHeaders: function (res, filePath) {
+        // 对于 .js 文件和 .json 文件 (例如 /api/web3-config 实际上是json，虽然我们已单独处理，但以防万一)
+        // 以及 HTML 文件，设置不缓存
+        if (path.extname(filePath) === '.js' || path.extname(filePath) === '.json' || path.extname(filePath) === '.html') {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache'); // For HTTP/1.0 backward compatibility
+            res.setHeader('Expires', '0'); // For proxies
+        }
+        // 你可以为其他文件类型设置不同的缓存策略
+        // 例如，图片、音频、视频可以缓存较长时间
+        // else if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.mp3', '.wav', '.ogg', '.mp4', '.webm'].includes(path.extname(filePath))) {
+        //     res.setHeader('Cache-Control', 'public, max-age=31536000'); // 缓存一年
+        // }
+    }
+}));
 
 // 设置默认首页
 app.get('/', (_, res) => {
