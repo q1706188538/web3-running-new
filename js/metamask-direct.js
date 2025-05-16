@@ -405,39 +405,15 @@ const MetaMaskManager = {
 document.addEventListener('DOMContentLoaded', function() {
     MetaMaskManager.init();
 
-    // 修改WalletManager的连接方法，优先使用MetaMask直连
+    // metamask-direct.js 的主要职责是提供 MetaMaskManager 和 connectWithMetaMaskDirect 功能。
+    // UI 流程和何时调用特定连接方法的决策应主要由 wallet.js 中的 WalletManager 控制。
+    // 因此，移除对 WalletManager.showMobileConnectGuide 的重写。
+    // WalletManager.connectWallet (in wallet.js) 已经更新，
+    // 会在适当的时候调用 WalletManager.showMobileConnectGuide (原始版本 in wallet.js)，
+    // 该版本现在会在移动设备上隐藏 MetaMask 按钮。
     if (typeof WalletManager !== 'undefined') {
-        // 保存原始的showMobileConnectGuide方法以便以后可能需要恢复
-        // 注意：我们目前没有使用这个变量，但保留它以便将来可能的扩展
-        // const originalShowMobileConnectGuide = WalletManager.showMobileConnectGuide;
-
-        // 重写showMobileConnectGuide方法
-        WalletManager.showMobileConnectGuide = function() {
-            console.log('WalletManager.showMobileConnectGuide (overridden) called on mobile.');
-            // 检查是否在dapp环境中 (window.ethereum 存在)
-            if (window.ethereum) {
-                console.log('DApp environment detected. Attempting direct connection via WalletManager.connectWallet().');
-                // 直接调用 WalletManager 的标准连接方法，它会使用 window.ethereum
-                // 这个方法应该处理 eth_requestAccounts 等，并且不应显示 MetaMaskManager 的特定加载UI
-                if (typeof WalletManager.connectWallet === 'function') {
-                    WalletManager.connectWallet();
-                } else {
-                    console.error('WalletManager.connectWallet is not defined! Cannot connect in DApp environment.');
-                    // 可以考虑一个备用方案或错误提示
-                }
-            } else {
-                // 如果不在dapp中 (例如普通移动浏览器), 则使用深度链接方法
-                console.log('Non-DApp mobile environment. Attempting connection via MetaMask deep link.');
-                if (typeof WalletManager.connectWithMetaMaskDirect === 'function') {
-                    // connectWithMetaMaskDirect 调用 MetaMaskManager.connect(),
-                    // 后者会显示 "正在连接..." UI 并尝试深度链接。
-                    WalletManager.connectWithMetaMaskDirect();
-                } else {
-                    console.error('WalletManager.connectWithMetaMaskDirect is not defined for deep linking!');
-                    // 作为后备，可以显示一个更通用的指南或错误
-                    // WalletManager.showMetaMaskMobileGuide(); // 确保这个方法不会再次错误地路由
-                }
-            }
-        };
+        console.log('MetaMaskManager initialized. WalletManager.connectWithMetaMaskDirect is now available if needed.');
+        // WalletManager.showMobileConnectGuide 的重写逻辑已移除。
+        // WalletManager (in wallet.js) 将自行处理其 UI 和连接流程。
     }
 });

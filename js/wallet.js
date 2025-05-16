@@ -39,9 +39,18 @@ const WalletManager = {
         this.checkResetNeeded();
 
         // 绑定按钮事件
-        document.getElementById('connect-wallet').addEventListener('click', this.connectWallet.bind(this));
-        document.getElementById('disconnect-wallet').addEventListener('click', this.disconnectWallet.bind(this));
-        document.getElementById('login-connect-button').addEventListener('click', this.connectWallet.bind(this));
+        const connectWalletBtn = document.getElementById('connect-wallet');
+        if (connectWalletBtn) {
+            connectWalletBtn.addEventListener('click', this.connectWallet.bind(this));
+        }
+        const disconnectWalletBtn = document.getElementById('disconnect-wallet');
+        if (disconnectWalletBtn) {
+            disconnectWalletBtn.addEventListener('click', this.disconnectWallet.bind(this));
+        }
+        const loginConnectBtn = document.getElementById('login-connect-button');
+        if (loginConnectBtn) { // login-connect-button 可能在移动设备上不创建
+            loginConnectBtn.addEventListener('click', this.connectWallet.bind(this));
+        }
 
         // 添加页面可见性变化事件监听器
         document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
@@ -266,7 +275,7 @@ const WalletManager = {
 
         // 创建说明文本
         const description = document.createElement('p');
-        description.textContent = '请连接MetaMask钱包以开始游戏';
+        description.textContent = '正在连接钱包,请等待...';
         description.style.cssText = 'font-size: 18px; margin-bottom: 30px;';
 
         // 创建MetaMask图标
@@ -274,46 +283,34 @@ const WalletManager = {
         metamaskIcon.style.cssText = 'width: 100px; height: 100px; background-image: url(https://metamask.io/images/metamask-fox.svg); background-size: contain; background-repeat: no-repeat; background-position: center; margin-bottom: 30px;';
         metamaskIcon.title = 'MetaMask钱包';
 
-        // 创建连接按钮
-        const connectButton = document.createElement('button');
-        connectButton.id = 'login-connect-button';
-
-        // 根据设备类型设置不同的按钮文本
-        if (isMobile && !isInMetaMaskBrowser) {
-            connectButton.textContent = '在移动设备上连接MetaMask';
-        } else {
-            connectButton.textContent = '连接MetaMask钱包';
+        // 创建连接按钮 - 只在非移动设备上创建
+        if (!isMobile) {
+            const connectButton = document.createElement('button');
+            connectButton.id = 'login-connect-button';
+            connectButton.textContent = '连接MetaMask钱包'; // 非移动设备上的文本
+            connectButton.style.cssText = 'background-color: #f5a623; color: white; border: none; padding: 15px 30px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 18px; transition: background-color 0.3s;';
+            // 鼠标悬停效果
+            connectButton.onmouseover = function() { this.style.backgroundColor = '#e69c1e'; };
+            connectButton.onmouseout = function() { this.style.backgroundColor = '#f5a623'; };
+            loginScreen.appendChild(connectButton);
         }
-
-        connectButton.style.cssText = 'background-color: #f5a623; color: white; border: none; padding: 15px 30px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 18px; transition: background-color 0.3s;';
-
-        // 鼠标悬停效果
-        connectButton.onmouseover = function() {
-            this.style.backgroundColor = '#e69c1e';
-        };
-        connectButton.onmouseout = function() {
-            this.style.backgroundColor = '#f5a623';
-        };
 
         // 创建提示文本
         const hint = document.createElement('p');
 
         // 根据设备类型设置不同的提示文本
-        if (isMobile && !isInMetaMaskBrowser) {
-            hint.innerHTML = '在移动设备上，您需要: <br>1. 在dapp里可直接连接<br>2. 安装 <a href="https://metamask.io/download.html" target="_blank" style="color: #f5a623; text-decoration: none;">MetaMask应用</a><br>3. 在MetaMask应用内的浏览器中打开本游戏';
+        if (isMobile) {
+            hint.innerHTML = '正在尝试自动连接钱包...<br>如果长时间未响应，请确保您的钱包应用已配置并授权本站点。 请检查你的网络是否正常';
         } else {
             hint.innerHTML = '没有MetaMask? <a href="https://metamask.io/download.html" target="_blank" style="color: #f5a623; text-decoration: none;">点击这里安装</a>';
         }
-
         hint.style.cssText = 'font-size: 14px; margin-top: 20px; line-height: 1.5;';
-
-
 
         // 组装登录屏幕
         loginScreen.appendChild(title);
         loginScreen.appendChild(description);
         loginScreen.appendChild(metamaskIcon);
-        loginScreen.appendChild(connectButton);
+        // connectButton 只在非移动设备时添加
         loginScreen.appendChild(hint);
 
         // 添加到页面
@@ -531,27 +528,18 @@ const WalletManager = {
         if (this.isMobileDevice()) {
             console.log('检测到移动设备');
 
-            // 检查是否可以使用MetaMask直连
-            if (typeof this.canUseMetaMaskDirect === 'function' && this.canUseMetaMaskDirect()) {
-                console.log('检测到可以使用MetaMask直连，尝试直接连接');
-                return this.connectWithMetaMaskDirect();
-            }
-
-            // 检查是否可以使用MetaMask SDK
-            if (this.canUseMetaMaskSDK()) {
-                console.log('检测到可以使用MetaMask SDK，尝试直接连接');
-                return this.connectWithMetaMaskSDK();
-            }
-
             // 检查是否在dapp中（如果在dapp中，应该已经有provider可用）
-            if (window.ethereum) {
-                console.log('检测到在dapp中，尝试直接连接');
+            if (window.ethereum && window.ethereum.isMetaMask) {
+                console.log('检测到在MetaMask DApp环境中，尝试直接连接');
+                // 继续执行后面的连接逻辑 (provider.request({ method: 'eth_requestAccounts' }))
+            } else if (window.ethereum) { // 其他 DApp 环境
+                console.log('检测到在其他DApp环境中，尝试直接连接');
                 // 继续执行后面的连接逻辑
             } else {
-                // 如果不在dapp中，显示MetaMask连接指南
-                console.log('不在dapp中，显示MetaMask连接指南');
-                this.showMetaMaskMobileGuide();
-                return;
+                // 如果不在dapp中 (普通移动浏览器), 显示连接选项 (不含MetaMask按钮)
+                console.log('不在DApp移动环境中，显示通用连接选项');
+                this.showMobileConnectGuide(); // 这将调用修改后的版本，不显示MM按钮
+                return; // 显示UI后等待用户操作
             }
         }
 
@@ -844,8 +832,13 @@ const WalletManager = {
             guideBox.appendChild(walletConnectButton);
         }
 
-        guideBox.appendChild(walletConnectButton);
-        guideBox.appendChild(metamaskButton);
+        guideBox.appendChild(walletConnectButton); // WalletConnect 按钮总是显示
+
+        if (!this.isMobileDevice()) { // 只在非移动设备上显示 MetaMask 按钮
+            guideBox.appendChild(metamaskButton);
+        }
+        // 在移动设备上，不添加 metamaskButton
+
         guideBox.appendChild(freeTrialButton);
         guideBox.appendChild(closeButton);
 
