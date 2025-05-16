@@ -2229,9 +2229,34 @@ const WalletManager = {
 
         try {
             if (!accounts || accounts.length === 0) {
-                // 用户断开了连接
-                console.log('检测到账户为空，执行断开连接操作');
-                await this.disconnectWallet();
+                console.log('检测到账户为空或未授权');
+                // 如果是移动DApp环境，并且需要登录（意味着登录屏幕可能已显示），则自动尝试连接
+                if (this.loginRequired && this.isMobileDevice() && typeof window.ethereum !== 'undefined') {
+                    console.log('移动DApp环境，账户未授权，自动尝试调用 connectWallet...');
+                    // 使用setTimeout避免可能的即时重入问题，并允许UI更新
+                    setTimeout(async () => {
+                        try {
+                            const connected = await this.connectWallet();
+                            if (connected) {
+                                console.log('自动 connectWallet 尝试成功。');
+                            } else {
+                                console.log('自动 connectWallet 尝试未成功连接或用户取消。');
+                                // 如果连接未成功，可能需要保留登录屏幕或执行标准断开逻辑
+                                // 为避免复杂化，暂时仅记录日志。登录屏幕应保持可见。
+                                // 如果需要，可以在这里触发 this.disconnectWallet()
+                            }
+                        } catch (error) {
+                            console.error('自动 connectWallet 尝试中发生错误:', error);
+                            // 错误情况下，也可能需要保留登录屏幕或执行断开
+                        }
+                    }, 100);
+                    // 注意：此处不立即调用 disconnectWallet，等待 connectWallet 尝试的结果。
+                    // loginRequired 为 true 时，登录屏幕应该已经显示。
+                } else {
+                    // 对于非移动DApp自动尝试场景（例如桌面，或非DApp环境），执行标准断开逻辑
+                    console.log('非移动DApp自动尝试场景，或不需要登录，执行标准断开连接操作');
+                    await this.disconnectWallet();
+                }
             } else {
                 // 检查账户是否真的变化了
                 const newAccount = accounts[0];
