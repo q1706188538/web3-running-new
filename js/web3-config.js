@@ -135,17 +135,17 @@ const Web3Config = {
 
     // 网络配置
     NETWORK: {
-        ID: 97,  // BSC测试网
-        NAME: "Binance Smart Chain Testnet",
-        RPC_URL: "https://data-seed-prebsc-1-s1.binance.org:8545/",
-        EXPLORER_URL: "https://testnet.bscscan.com"
+        ID: 56,  // BSC主网
+        NAME: "Binance Smart Chain Mainnet",
+        RPC_URL: "https://bsc-dataseed.binance.org/",
+        EXPLORER_URL: "https://bscscan.com"
     },
 
     // 桥接合约配置
     BRIDGE_CONTRACT: {
         ADDRESS: "0xf54677367e6D3511DCa4C336EfE31eaDFc0cDc1b",  // 桥接合约地址（新部署的合约地址）
         OWNER_ADDRESS: "0x744b9acff32f9184c6f6639e6536437e975a4444",  // 合约所有者地址
-        GAME_SERVER_ADDRESS: "0xE628408B47918c17cf6B97dDfa2A27c9a1CF451d",  // 游戏服务器地址 (恢复原始值)
+        GAME_SERVER_ADDRESS: "0xadd34cadc4f69c65fb38c1ceecec707f05865163",  // 游戏服务器地址 (与live-config一致)
         TAX_WALLET_ADDRESS: "0xedea273fbfad20943aa75d3d77646b23a63707a9"  // 税收钱包地址
     },
 

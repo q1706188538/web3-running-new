@@ -91,25 +91,105 @@
             this.applyUIToCurrentPlay();
         },
 
-        // 获取MetaMask钱包地址
+        // 获取钱包地址
         getWalletAddress: function() {
-            // 优先使用WalletManager获取地址
-            if (window.WalletManager && typeof window.WalletManager.getAccount === 'function') {
-                this.walletAddress = window.WalletManager.getAccount();
+            // 首先尝试从WalletManager获取
+            if (typeof WalletManager !== 'undefined' && WalletManager.getAccount) {
+                this.walletAddress = WalletManager.getAccount();
                 console.log('从WalletManager获取钱包地址:', this.walletAddress);
-                return;
+                if (this.walletAddress) {
+                    return;
+                }
             }
             
             // 如果WalletManager不可用，尝试直接从ethereum对象获取
             if (window.ethereum && window.ethereum.selectedAddress) {
                 this.walletAddress = window.ethereum.selectedAddress;
                 console.log('从ethereum对象获取钱包地址:', this.walletAddress);
+                if (this.walletAddress) {
+                    return;
+                }
+            }
+            
+            // 尝试从Web3TokenContract获取
+            if (typeof Web3TokenContract !== 'undefined' && Web3TokenContract.userAddress) {
+                this.walletAddress = Web3TokenContract.userAddress;
+                console.log('从Web3TokenContract获取钱包地址:', this.walletAddress);
+                if (this.walletAddress) {
+                    return;
+                }
+            }
+            
+            // 尝试从provider获取
+            if (typeof Web3TokenContract !== 'undefined' && Web3TokenContract.web3 && Web3TokenContract.web3.currentProvider) {
+                if (Web3TokenContract.web3.currentProvider.selectedAddress) {
+                    this.walletAddress = Web3TokenContract.web3.currentProvider.selectedAddress;
+                    console.log('从web3.currentProvider.selectedAddress获取钱包地址:', this.walletAddress);
+                    if (this.walletAddress) {
+                        return;
+                    }
+                } else if (Web3TokenContract.web3.currentProvider.accounts && Web3TokenContract.web3.currentProvider.accounts.length > 0) {
+                    this.walletAddress = Web3TokenContract.web3.currentProvider.accounts[0];
+                    console.log('从web3.currentProvider.accounts获取钱包地址:', this.walletAddress);
+                    if (this.walletAddress) {
+                        return;
+                    }
+                }
+            }
+            
+            // 尝试通过eth_accounts静默获取
+            if (window.ethereum) {
+                console.log('尝试通过eth_accounts静默获取钱包地址...');
+                window.ethereum.request({ method: 'eth_accounts' })
+                    .then(accounts => {
+                        if (accounts && accounts.length > 0) {
+                            this.walletAddress = accounts[0];
+                            console.log('通过eth_accounts静默获取到钱包地址:', this.walletAddress);
+                            // 立即刷新用户数据
+                            this.fetchUserData();
+                        } else {
+                            console.log('eth_accounts未返回任何地址');
+                            // 如果静默获取失败，尝试主动请求连接钱包
+                            this.connectWallet();
+                        }
+                    })
+                    .catch(err => {
+                        console.error('通过eth_accounts获取钱包地址失败:', err);
+                        // 如果静默获取失败，尝试主动请求连接钱包
+                        this.connectWallet();
+                    });
                 return;
             }
             
-            // 如果都不可用，直接提示错误
-            console.error('无法获取钱包地址，请确保已连接MetaMask钱包');
-            this.walletAddress = null;
+            // 如果都不可用，尝试主动连接钱包
+            this.connectWallet();
+        },
+        
+        // 主动请求连接钱包
+        connectWallet: function() {
+            console.log('尝试主动连接钱包...');
+            if (window.ethereum) {
+                window.ethereum.request({ method: 'eth_requestAccounts' })
+                    .then(accounts => {
+                        if (accounts && accounts.length > 0) {
+                            this.walletAddress = accounts[0];
+                            console.log('成功连接钱包，地址:', this.walletAddress);
+                            // 连接成功后刷新用户数据
+                            this.fetchUserData();
+                        } else {
+                            console.error('连接钱包失败: 未返回账户');
+                            this.showBrowserNotification('Please connect your wallet manually');
+                        }
+                    })
+                    .catch(err => {
+                        console.error('连接钱包请求被拒绝:', err);
+                        this.showBrowserNotification('Please connect your wallet manually');
+                    });
+            } else {
+                console.error('无法获取钱包地址，请确保已安装MetaMask或其他兼容钱包');
+                this.walletAddress = null;
+                this.showBrowserNotification('Please install MetaMask or other compatible wallet');
+            }
         },
         
         // 从API获取用户数据

@@ -32265,8 +32265,8 @@ GEMIOLI.Menu = function() {
 	a.bottom.addChild(a.more);
 	a.shop = new GEMIOLI.Button(-178, -167, 356, 335, [66]);
 	a.shop.addChild(GEMIOLI.AtlasQuad.fromRect(-178, -167, 356, 335, "atlases/menu.atlas", "shop"));
-	a.shop.x = 600;
-	a.shop.y = -190;
+	a.shop.x = -600;
+	a.shop.y = -550;
 	a.shop.addEventListener("click", function(b) {
 		if (!a.showing || GEMIOLI.Button.inFocus) {
 			return

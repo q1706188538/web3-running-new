@@ -76,8 +76,31 @@ const Web3TokenContract = {
                         // 另一个备用方案：某些 provider 可能直接暴露 accounts 数组
                         this.userAddress = this.web3.currentProvider.accounts[0];
                         console.log('Web3TokenContract.init: 通过 currentProvider.accounts 获取到钱包地址:', this.userAddress);
+                    } else if (window.ethereum && window.ethereum.selectedAddress) {
+                        // dapp浏览器特殊处理：直接从window.ethereum获取
+                        this.userAddress = window.ethereum.selectedAddress;
+                        console.log('Web3TokenContract.init: 通过 window.ethereum.selectedAddress 获取到钱包地址:', this.userAddress);
                     } else {
-                        console.log('Web3TokenContract.init: 未能通过 getAccounts() 或 currentProvider.selectedAddress/accounts 检测到已连接的钱包。');
+                        console.log('Web3TokenContract.init: 未能通过常规方法检测到已连接的钱包。尝试其他方法...');
+                        
+                        // 对于某些dapp浏览器，可能需要尝试请求账户
+                        try {
+                            if (window.ethereum) {
+                                // 静默请求账户（不弹出钱包选择对话框）
+                                const silentAccounts = await window.ethereum.request({ 
+                                    method: 'eth_accounts' // 使用eth_accounts而不是eth_requestAccounts
+                                });
+                                
+                                if (silentAccounts && silentAccounts.length > 0) {
+                                    this.userAddress = silentAccounts[0];
+                                    console.log('Web3TokenContract.init: 通过 eth_accounts 静默获取到钱包地址:', this.userAddress);
+                                } else {
+                                    console.log('Web3TokenContract.init: eth_accounts 未返回任何地址');
+                                }
+                            }
+                        } catch (silentError) {
+                            console.warn('尝试静默获取账户失败:', silentError);
+                        }
                     }
                 } catch (accountError) {
                     console.warn('获取账户失败，但仍然创建合约实例:', accountError);
@@ -240,6 +263,61 @@ const Web3TokenContract = {
                 this.web3 = new Web3(window.ethereum);
                 console.log('使用window.ethereum初始化Web3（不请求账户）');
 
+                // 获取目标网络ID
+                const targetNetworkId = this.getNetworkIdFromConfig();
+                console.log('目标网络ID:', targetNetworkId);
+
+                // 检查当前网络ID
+                this.web3.eth.net.getId()
+                    .then(async (currentNetworkId) => {
+                        console.log('当前网络ID:', currentNetworkId);
+                        
+                        // 如果网络ID不匹配，尝试切换网络
+                        if (currentNetworkId !== targetNetworkId) {
+                            console.warn(`当前网络ID(${currentNetworkId})与目标网络ID(${targetNetworkId})不匹配，尝试切换网络...`);
+                            
+                            try {
+                                // 尝试切换到目标网络
+                                await window.ethereum.request({
+                                    method: 'wallet_switchEthereumChain',
+                                    params: [{ chainId: '0x' + targetNetworkId.toString(16) }]
+                                });
+                                console.log('成功切换到目标网络');
+                            } catch (switchError) {
+                                // 如果用户拒绝切换或网络未添加，显示错误
+                                if (switchError.code === 4902 || switchError.message.includes('wallet_addEthereumChain')) {
+                                    // 网络未添加，尝试添加BSC主网
+                                    try {
+                                        await window.ethereum.request({
+                                            method: 'wallet_addEthereumChain',
+                                            params: [{
+                                                chainId: '0x' + targetNetworkId.toString(16),
+                                                chainName: 'Binance Smart Chain Mainnet',
+                                                nativeCurrency: {
+                                                    name: 'BNB',
+                                                    symbol: 'BNB',
+                                                    decimals: 18
+                                                },
+                                                rpcUrls: ['https://bsc-dataseed.binance.org/'],
+                                                blockExplorerUrls: ['https://bscscan.com/']
+                                            }]
+                                        });
+                                        console.log('成功添加并切换到BSC主网');
+                                    } catch (addError) {
+                                        console.error('添加BSC主网失败:', addError);
+                                        alert('请手动将钱包切换到BSC主网');
+                                    }
+                                } else {
+                                    console.error('切换网络失败:', switchError);
+                                    alert('请手动将钱包切换到BSC主网');
+                                }
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('获取当前网络ID失败:', error);
+                    });
+
                 // 监听账户变化
                 window.ethereum.on('accountsChanged', (accounts) => {
                     if (accounts.length > 0) {
@@ -260,6 +338,25 @@ const Web3TokenContract = {
                             detail: { address: null }
                         });
                         document.dispatchEvent(walletChangeEvent);
+                    }
+                });
+
+                // 监听链ID变化
+                window.ethereum.on('chainChanged', (chainId) => {
+                    console.log('钱包网络已更改:', chainId);
+                    // 将十六进制的chainId转换为十进制
+                    const networkId = parseInt(chainId, 16);
+                    
+                    // 获取目标网络ID
+                    const targetNetworkId = this.getNetworkIdFromConfig();
+                    
+                    if (networkId !== targetNetworkId) {
+                        console.warn(`当前网络ID(${networkId})与目标网络ID(${targetNetworkId})不匹配`);
+                        alert(`请将钱包切换到BSC主网(ID: ${targetNetworkId})`);
+                    } else {
+                        console.log('已切换到正确的网络');
+                        // 刷新页面以重新加载合约
+                        window.location.reload();
                     }
                 });
 
@@ -475,13 +572,14 @@ const Web3TokenContract = {
                 console.log('从GameConfig.TOKEN_RECHARGE获取网络ID:', GameConfig.TOKEN_RECHARGE.NETWORK_ID);
                 return GameConfig.TOKEN_RECHARGE.NETWORK_ID;
             }
-} // 关闭 if (typeof GameConfig !== 'undefined')
-            // 如果都没有配置，返回默认值97（BSC测试网）
-            console.warn('未找到网络ID配置，使用默认值97（BSC测试网）');
-            return 97;
-        },
+        }
 
-// 获取外部代币的名称、符号和小数位数
+        // 如果都没有配置，返回默认值97（BSC测试网）
+        console.warn('未找到网络ID配置，使用默认值97（BSC测试网）');
+        return 97;
+    },
+
+    // 获取外部代币的名称、符号和小数位数
     getTokenInfo: async function() {
         if (!this.web3) {
             console.error("Web3TokenContract.getTokenInfo: Web3 is not initialized.");
@@ -631,7 +729,35 @@ const Web3TokenContract = {
         }
 
         // 如果未提供地址，使用当前连接的钱包地址
-        const walletAddress = address || this.userAddress;
+        let walletAddress = address || this.userAddress;
+
+        // dapp浏览器特殊处理：如果walletAddress为空，尝试从多个可能的来源获取
+        if (!walletAddress) {
+            console.log('getBalance: 未提供钱包地址且this.userAddress为空，尝试从其他来源获取');
+            
+            // 尝试从window.ethereum获取
+            if (window.ethereum && window.ethereum.selectedAddress) {
+                walletAddress = window.ethereum.selectedAddress;
+                console.log('getBalance: 从window.ethereum.selectedAddress获取到钱包地址:', walletAddress);
+            }
+            // 尝试从web3.currentProvider获取
+            else if (this.web3 && this.web3.currentProvider) {
+                if (this.web3.currentProvider.selectedAddress) {
+                    walletAddress = this.web3.currentProvider.selectedAddress;
+                    console.log('getBalance: 从web3.currentProvider.selectedAddress获取到钱包地址:', walletAddress);
+                } 
+                else if (this.web3.currentProvider.accounts && this.web3.currentProvider.accounts.length > 0) {
+                    walletAddress = this.web3.currentProvider.accounts[0];
+                    console.log('getBalance: 从web3.currentProvider.accounts获取到钱包地址:', walletAddress);
+                }
+            }
+            
+            // 如果找到了地址，更新this.userAddress
+            if (walletAddress) {
+                this.userAddress = walletAddress;
+                console.log('getBalance: 更新this.userAddress为:', walletAddress);
+            }
+        }
 
         if (!walletAddress) {
             console.error('获取余额失败: 未提供钱包地址且未连接钱包');
@@ -639,6 +765,23 @@ const Web3TokenContract = {
         }
 
         try {
+            // 检查当前网络ID是否正确
+            try {
+                const currentNetworkId = await this.web3.eth.net.getId();
+                const targetNetworkId = this.getNetworkIdFromConfig();
+                
+                if (currentNetworkId !== targetNetworkId) {
+                    console.error(`获取余额失败: 当前网络ID(${currentNetworkId})与目标网络ID(${targetNetworkId})不匹配`);
+                    throw new Error(`钱包连接到了错误的网络。请切换到BSC主网(ID: ${targetNetworkId})`);
+                }
+            } catch (networkError) {
+                if (networkError.message.includes('钱包连接到了错误的网络')) {
+                    throw networkError;
+                }
+                console.warn('检查网络ID时出错:', networkError);
+                // 继续执行，因为这可能只是网络检查失败，而不是获取余额失败
+            }
+
             // 从桥接合约获取外部代币地址
             let externalTokenAddress = null;
             try {

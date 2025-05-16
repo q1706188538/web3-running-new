@@ -87,6 +87,40 @@ const TokenRecharge = {
                     // 如果Web3TokenContract已有地址，使用它
                     this.walletAddress = Web3TokenContract.userAddress;
                     console.log('使用Web3TokenContract中的钱包地址:', this.walletAddress);
+                } else {
+                    // 尝试其他方法获取钱包地址
+                    console.log('TokenRecharge.init: 尝试其他方法获取钱包地址');
+                    
+                    // 尝试从provider中获取
+                    if (Web3TokenContract.web3 && Web3TokenContract.web3.currentProvider) {
+                        if (Web3TokenContract.web3.currentProvider.selectedAddress) {
+                            this.walletAddress = Web3TokenContract.web3.currentProvider.selectedAddress;
+                            Web3TokenContract.userAddress = this.walletAddress;
+                            console.log('TokenRecharge.init: 从web3.currentProvider.selectedAddress获取到钱包地址:', this.walletAddress);
+                        } else if (Web3TokenContract.web3.currentProvider.accounts && Web3TokenContract.web3.currentProvider.accounts.length > 0) {
+                            this.walletAddress = Web3TokenContract.web3.currentProvider.accounts[0];
+                            Web3TokenContract.userAddress = this.walletAddress;
+                            console.log('TokenRecharge.init: 从web3.currentProvider.accounts获取到钱包地址:', this.walletAddress);
+                        }
+                    }
+                    
+                    // 如果还是没有钱包地址，尝试静默请求
+                    if (!this.walletAddress && window.ethereum) {
+                        try {
+                            // 静默请求账户（不弹出钱包选择对话框）
+                            const silentAccounts = await window.ethereum.request({ 
+                                method: 'eth_accounts' // 使用eth_accounts而不是eth_requestAccounts
+                            });
+                            
+                            if (silentAccounts && silentAccounts.length > 0) {
+                                this.walletAddress = silentAccounts[0];
+                                Web3TokenContract.userAddress = this.walletAddress;
+                                console.log('TokenRecharge.init: 通过eth_accounts静默获取到钱包地址:', this.walletAddress);
+                            }
+                        } catch (silentError) {
+                            console.warn('TokenRecharge.init: 尝试静默获取账户失败:', silentError);
+                        }
+                    }
                 }
 
                 // 初始化合约
@@ -623,6 +657,22 @@ const TokenRecharge = {
     // 更新余额信息
     updateBalances: async function() {
         console.log('更新余额信息');
+
+        // 如果钱包地址为空，尝试从多个可能的来源获取
+        if (!this.walletAddress) {
+            console.log('TokenRecharge.updateBalances: 钱包地址为空，尝试从其他来源获取');
+            
+            // 尝试从window.ethereum获取
+            if (window.ethereum && window.ethereum.selectedAddress) {
+                this.walletAddress = window.ethereum.selectedAddress;
+                console.log('TokenRecharge.updateBalances: 从window.ethereum.selectedAddress获取到钱包地址:', this.walletAddress);
+            }
+            // 尝试从Web3TokenContract获取
+            else if (typeof Web3TokenContract !== 'undefined' && Web3TokenContract.userAddress) {
+                this.walletAddress = Web3TokenContract.userAddress;
+                console.log('TokenRecharge.updateBalances: 从Web3TokenContract.userAddress获取到钱包地址:', this.walletAddress);
+            }
+        }
 
         if (!this.walletAddress) {
             console.error('更新余额信息失败: 钱包地址为空');

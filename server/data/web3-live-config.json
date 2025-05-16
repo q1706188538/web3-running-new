@@ -7,10 +7,10 @@
     "API_BASE_URL": "/api"
   },
   "NETWORK": {
-    "ID": 97,
-    "NAME": "Binance Smart Chain Testnet",
-    "RPC_URL": "https://data-seed-prebsc-1-s1.binance.org:8545/",
-    "EXPLORER_URL": "https://testnet.bscscan.com"
+    "ID": 56,
+    "NAME": "Binance Smart Chain Mainnet",
+    "RPC_URL": "https://bsc-dataseed.binance.org/",
+    "EXPLORER_URL": "https://bscscan.com"
   },
   "BRIDGE_CONTRACT": {
     "ADDRESS": "0xf54677367e6D3511DCa4C336EfE31eaDFc0cDc1b",
