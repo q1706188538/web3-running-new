@@ -41,10 +41,24 @@ const WalletProgress = {
         }
     },
 
+    // 防抖动标志，防止短时间内多次调用
+    _syncInProgress: false,
+    _lastSyncTime: 0,
+
     // 从后端同步所有用户数据到本地
     syncDataFromBackend: async function() {
+        // 防抖动：如果正在同步或者距离上次同步不到3秒，则跳过
+        const now = Date.now();
+        if (this._syncInProgress || (now - this._lastSyncTime < 3000)) {
+            console.log('同步操作正在进行中或刚刚完成，跳过此次同步请求');
+            return true; // 返回true避免调用者认为失败并重试
+        }
+
+        this._syncInProgress = true;
+
         if (!this.useApi || !WalletManager.isConnected()) {
             console.log('不从后端同步数据：API未启用或钱包未连接');
+            this._syncInProgress = false;
             return false;
         }
 
@@ -58,7 +72,14 @@ const WalletProgress = {
                 const url = ApiService.buildApiUrl(`/user/${walletAddress}`);
                 console.log('获取用户数据URL:', url);
 
-                const response = await fetch(url);
+                // 添加缓存控制头，避免使用缓存的结果
+                const response = await fetch(url, {
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                });
 
                 if (!response.ok) {
                     if (response.status === 404) {
@@ -66,9 +87,12 @@ const WalletProgress = {
                         // 创建新用户数据 (使用相对路径)
                         const createUrl = `/create-user-data/${walletAddress}`; // 使用相对路径
                         await fetch(createUrl);
-                        return false;
+                        this._syncInProgress = false;
+                        this._lastSyncTime = Date.now();
+                        return true; // 返回true表示操作已处理
                     } else {
                         console.error('获取用户数据失败，状态码:', response.status);
+                        this._syncInProgress = false;
                         return false;
                     }
                 }
@@ -136,13 +160,17 @@ const WalletProgress = {
                 }
 
                 console.log('所有用户数据已从后端同步到本地存储');
+                this._syncInProgress = false;
+                this._lastSyncTime = Date.now();
                 return true;
             } catch (error) {
                 console.error('获取或处理用户数据时出错:', error);
+                this._syncInProgress = false;
                 return false;
             }
         } catch (error) {
             console.error('从后端同步数据时出错:', error);
+            this._syncInProgress = false;
             return false;
         }
     },

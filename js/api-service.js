@@ -29,6 +29,11 @@ if (typeof window.ApiService === 'undefined') {
         return `/api${apiPath}`;
     },
 
+    // 用户数据缓存
+    _userDataCache: {},
+    _userDataTimestamps: {},
+    _userDataRequests: {},
+
     // 获取用户数据
     getUserData: async function(walletAddress) {
         if (!walletAddress) {
@@ -36,29 +41,91 @@ if (typeof window.ApiService === 'undefined') {
             return null;
         }
 
+        // 防抖动：如果同一个钱包地址的请求正在进行中，返回缓存数据或等待
+        if (this._userDataRequests[walletAddress]) {
+            console.log('已有相同钱包地址的请求正在进行中，使用缓存数据或等待');
+
+            // 如果有缓存数据且不超过5秒，直接返回缓存
+            const now = Date.now();
+            if (this._userDataCache[walletAddress] &&
+                this._userDataTimestamps[walletAddress] &&
+                (now - this._userDataTimestamps[walletAddress] < 5000)) {
+                console.log('使用缓存的用户数据');
+                return this._userDataCache[walletAddress];
+            }
+
+            // 否则等待现有请求完成
+            try {
+                await this._userDataRequests[walletAddress];
+                return this._userDataCache[walletAddress] || {};
+            } catch (error) {
+                console.error('等待现有请求时出错:', error);
+                return this._userDataCache[walletAddress] || {};
+            }
+        }
+
+        // 创建一个Promise，用于跟踪请求状态
+        this._userDataRequests[walletAddress] = new Promise(async (resolve, reject) => {
+            try {
+                // 使用辅助方法构建API URL
+                const url = this.buildApiUrl(`/user/${walletAddress}`);
+                console.log('获取用户数据URL:', url);
+
+                // 添加缓存控制头，避免使用缓存的结果
+                const response = await fetch(url, {
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                });
+
+                if (response.status === 404) {
+                    console.log('未找到用户数据，返回空对象');
+                    this._userDataCache[walletAddress] = {};
+                    this._userDataTimestamps[walletAddress] = Date.now();
+                    resolve({});
+                    return {};
+                }
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let errorMessage;
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.error || '获取用户数据失败';
+                    } catch (e) {
+                        errorMessage = `获取用户数据失败: ${response.status} ${response.statusText}`;
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                const userData = await response.json();
+                console.log('获取用户数据成功:', userData);
+
+                // 更新缓存
+                this._userDataCache[walletAddress] = userData;
+                this._userDataTimestamps[walletAddress] = Date.now();
+
+                resolve(userData);
+                return userData;
+            } catch (error) {
+                console.error('获取用户数据出错:', error.message);
+                // 如果API请求失败，返回缓存数据或空对象
+                const cachedData = this._userDataCache[walletAddress] || {};
+                reject(error);
+                return cachedData;
+            } finally {
+                // 请求完成后，删除请求标记
+                delete this._userDataRequests[walletAddress];
+            }
+        });
+
         try {
-            // 使用辅助方法构建API URL
-            const url = this.buildApiUrl(`/user/${walletAddress}`);
-            console.log('获取用户数据URL:', url);
-            const response = await fetch(url);
-
-            if (response.status === 404) {
-                console.log('未找到用户数据，返回空对象');
-                return {};
-            }
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || '获取用户数据失败');
-            }
-
-            const userData = await response.json();
-            console.log('获取用户数据成功:', userData);
-            return userData;
+            return await this._userDataRequests[walletAddress];
         } catch (error) {
-            console.error('获取用户数据出错:', error.message);
-            // 如果API请求失败，返回空对象而不是null，以便前端代码可以继续运行
-            return {};
+            // 如果请求失败，返回缓存数据或空对象
+            return this._userDataCache[walletAddress] || {};
         }
     },
 

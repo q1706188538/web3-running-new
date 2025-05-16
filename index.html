@@ -11,6 +11,11 @@
 		<meta name="apple-touch-fullscreen" content="yes" />
 		<meta name="HandheldFriendly" content="true" />
 		<meta name="mobile-web-app-capable" content="yes">
+
+		<!-- 禁用缓存的meta标签 -->
+		<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+		<meta http-equiv="Pragma" content="no-cache">
+		<meta http-equiv="Expires" content="0">
 		<!-- Web3.js库 -->
 		<script src="https://cdn.jsdelivr.net/npm/web3@1.8.0/dist/web3.min.js"></script>
 
@@ -21,59 +26,79 @@
 		<script type="text/javascript" src="./js/simple-wallet-connect.js"></script>
 		<script type="text/javascript" src="./js/static-wallet-connect.js"></script>
 
-		<!-- 配置脚本 - 必须最先加载 -->
-		<script type="text/javascript" src="./js/config.js"></script>
-		<script type="text/javascript" src="./js/web3-config.js"></script>
-		<script type="text/javascript" src="./js/game-config-compat.js"></script>
+		<!-- 配置脚本 - 必须最先加载 (添加时间戳防止缓存) -->
+		<script type="text/javascript">
+			// 生成时间戳，防止缓存
+			var cacheBuster = new Date().getTime();
+		</script>
+		<script type="text/javascript">
+			document.write('<script type="text/javascript" src="./js/config.js?v=' + cacheBuster + '"><\/script>');
+		</script>
+		<script type="text/javascript">
+			document.write('<script type="text/javascript" src="./js/web3-config.js?v=' + cacheBuster + '"><\/script>');
+			document.write('<script type="text/javascript" src="./js/game-config-compat.js?v=' + cacheBuster + '"><\/script>');
+		</script>
 
 		<!-- API服务 - 在配置脚本之后加载 -->
-		<script type="text/javascript" src="./js/api-service.js"></script>
+		<script type="text/javascript">
+			document.write('<script type="text/javascript" src="./js/api-service.js?v=' + cacheBuster + '"><\/script>');
+		</script>
 
 		<!-- 确保API服务完全加载 -->
 
 		<!-- 游戏脚本 -->
-		<script type="text/javascript" src="./js/game.js"></script>
-		<script src="game.js"></script>
+		<script type="text/javascript">
+			// 为游戏脚本添加时间戳
+			document.write('<script type="text/javascript" src="./js/game.js?v=' + cacheBuster + '"><\/script>');
+			document.write('<script src="game.js?v=' + cacheBuster + '"><\/script>');
+
+			// 为钱包相关脚本添加时间戳
+			document.write('<script type="text/javascript" src="./js/leaderboard.js?v=' + cacheBuster + '"><\/script>'); // 排行榜脚本
+			document.write('<script type="text/javascript" src="./js/reward-pool-panel.js?v=' + cacheBuster + '"><\/script>'); // 奖励池面板脚本
+			document.write('<script type="text/javascript" src="./js/funding-pool-panel.js?v=' + cacheBuster + '"><\/script>'); // 资金池面板脚本
+			document.write('<script type="text/javascript" src="./js/wallet.js?v=' + cacheBuster + '"><\/script>');
+			document.write('<script type="text/javascript" src="./js/wallet-progress.js?v=' + cacheBuster + '"><\/script>');
+			document.write('<script type="text/javascript" src="./js/wallet-game-integration.js?v=' + cacheBuster + '"><\/script>');
+		</script>
 
 		<!-- 钱包相关脚本 -->
-		<script type="text/javascript" src="./js/leaderboard.js"></script> <!-- 排行榜脚本 -->
-		<script type="text/javascript" src="./js/reward-pool-panel.js"></script> <!-- 奖励池面板脚本 -->
-		<script type="text/javascript" src="./js/funding-pool-panel.js"></script> <!-- 资金池面板脚本 -->
-		<script type="text/javascript" src="./js/wallet.js"></script>
-		<script type="text/javascript" src="./js/wallet-progress.js"></script>
-		<script type="text/javascript" src="./js/wallet-game-integration.js"></script>
 		<!-- 暂时不需要游戏状态面板 -->
 		<!-- <script type="text/javascript" src="./js/game-status-panel.js"></script> -->
-		<script type="text/javascript" src="./js/debug-tools.js"></script>
-		<script type="text/javascript" src="./js/play-button-interceptor.js"></script>
-		<script type="text/javascript" src="./js/GameTokenBridgeInverseABI.js"></script>
-		<script type="text/javascript" src="./js/web3-token-contract-new.js"></script>
-		<script type="text/javascript" src="./js/token-exchange.js"></script>
-		<script type="text/javascript" src="./js/token-recharge.js"></script>
+		<script type="text/javascript">
+			// 为其他脚本添加时间戳
+			document.write('<script type="text/javascript" src="./js/debug-tools.js?v=' + cacheBuster + '"><\/script>');
+			document.write('<script type="text/javascript" src="./js/play-button-interceptor.js?v=' + cacheBuster + '"><\/script>');
+			document.write('<script type="text/javascript" src="./js/GameTokenBridgeInverseABI.js?v=' + cacheBuster + '"><\/script>');
+			document.write('<script type="text/javascript" src="./js/web3-token-contract-new.js?v=' + cacheBuster + '"><\/script>');
+			document.write('<script type="text/javascript" src="./js/token-exchange.js?v=' + cacheBuster + '"><\/script>');
+			document.write('<script type="text/javascript" src="./js/token-recharge.js?v=' + cacheBuster + '"><\/script>');
 
-		<!-- 配置补丁，禁用不必要的网络请求 -->
-		<script type="text/javascript" src="./js/config-patch.js"></script>
+			// 配置补丁，禁用不必要的网络请求
+			document.write('<script type="text/javascript" src="./js/config-patch.js?v=' + cacheBuster + '"><\/script>');
 
-		<!-- 移动设备触摸控制 -->
-		<script type="text/javascript" src="./js/touch-controls.js"></script>
+			// 移动设备触摸控制
+			document.write('<script type="text/javascript" src="./js/touch-controls.js?v=' + cacheBuster + '"><\/script>');
 
-		<!-- 音频预加载器 -->
-		<script type="text/javascript" src="./js/audio-preloader.js"></script>
+			// 音频预加载器
+			document.write('<script type="text/javascript" src="./js/audio-preloader.js?v=' + cacheBuster + '"><\/script>');
 
-		<!-- imToken钱包连接器 -->
-		<script type="text/javascript" src="./js/imtoken-connector.js"></script>
+			// imToken钱包连接器
+			document.write('<script type="text/javascript" src="./js/imtoken-connector.js?v=' + cacheBuster + '"><\/script>');
 
-		<!-- MetaMask 直接集成 -->
-		<script type="text/javascript" src="./js/metamask-direct.js"></script>
+			// MetaMask 直接集成
+			document.write('<script type="text/javascript" src="./js/metamask-direct.js?v=' + cacheBuster + '"><\/script>');
 
-		<!-- 原生游戏状态UI -->
-		<script type="text/javascript" src="./js/game-state-ui.js"></script>
+			// 原生游戏状态UI
+			document.write('<script type="text/javascript" src="./js/game-state-ui.js?v=' + cacheBuster + '"><\/script>');
 
-		<!-- 游戏验证器 -->
-		<script type="text/javascript" src="./js/game-verifier.js"></script>
+			// 游戏验证器
+			document.write('<script type="text/javascript" src="./js/game-verifier.js?v=' + cacheBuster + '"><\/script>');
+		</script>
 
 		<!-- 代币兑换样式 -->
-		<link rel="stylesheet" href="./js/token-exchange-styles.css">
+		<script type="text/javascript">
+			document.write('<link rel="stylesheet" href="./js/token-exchange-styles.css?v=' + cacheBuster + '">');
+		</script>
 
 		<style>
 			#container {
@@ -492,28 +517,8 @@
 									console.log('用户数据已存在，不创建新数据:', existingUserData);
 								}
 
-								// 再次检查用户数据是否存在
-								setTimeout(async () => {
-									try {
-										// 使用ApiService构建URL
-										const checkUrl = ApiService.buildApiUrl(`/user/${walletAddress}`);
-										console.log('检查用户数据URL:', checkUrl);
-
-										const checkResponse = await fetch(checkUrl);
-										if (checkResponse.ok) {
-											const userData = await checkResponse.json();
-											console.log('获取用户数据结果:', userData);
-										} else {
-											console.error('获取用户数据失败，状态码:', checkResponse.status);
-										}
-
-										// 检查data目录 - 使用相对路径
-										const checkDataDir = await fetch('/check-data-dir');
-										console.log('检查data目录结果:', await checkDataDir.text());
-									} catch (e) {
-										console.error('检查用户数据时出错:', e);
-									}
-								}, 1000);
+								// 不再重复检查用户数据，避免多余的API请求
+								console.log('用户数据初始化完成，不再重复检查');
 							} catch (fetchError) {
 								console.error('获取或创建用户数据时出错:', fetchError);
 							}
