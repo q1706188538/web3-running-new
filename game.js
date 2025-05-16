@@ -32834,9 +32834,17 @@ GEMIOLI.Score = function() {
 				return;
 			}
 
+			// 动态获取最新的重启成本
+			const costToRestart = (typeof Web3Config !== 'undefined' && Web3Config.GAME && typeof Web3Config.GAME.RESTART_COST === 'number')
+								? Web3Config.GAME.RESTART_COST
+								: ((typeof GameConfig !== 'undefined' && typeof GameConfig.RESTART_GAME_COST === 'number')
+									? GameConfig.RESTART_GAME_COST
+									: 10); // Fallback to 10 if no config found
+			console.log('确认再来一次 - 实际扣费金额 (costToRestart):', costToRestart);
+
 			// 检查金币是否足够
-			if (currentCoins < RESTART_COINS_COST) {
-				alert('金币不足，无法开始游戏！');
+			if (currentCoins < costToRestart) {
+				alert('金币不足，无法开始游戏！需要 ' + costToRestart + ' 金币，当前拥有 ' + currentCoins + ' 金币。');
 				hideRestartConfirmation();
 
 				// 恢复确认按钮
@@ -32852,8 +32860,8 @@ GEMIOLI.Score = function() {
 			// 通过API扣除金币
 			try {
 				const walletAddress = WalletManager.getAccount();
-				console.log('通过API扣除金币:', RESTART_COINS_COST);
-				const newCoins = await ApiService.updateCoins(walletAddress, RESTART_COINS_COST, 'subtract', 'restart');
+				console.log('通过API扣除金币:', costToRestart);
+				const newCoins = await ApiService.updateCoins(walletAddress, costToRestart, 'subtract', 'restart_game'); // 修改 reason 为 restart_game
 				console.log('扣除后的金币余额:', newCoins);
 			} catch (error) {
 				console.error('扣除金币时出错:', error);

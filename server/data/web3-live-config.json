@@ -1,7 +1,7 @@
 {
   "GAME": {
-    "START_COST": 0,
-    "RESTART_COST": 0,
+    "START_COST": 200,
+    "RESTART_COST": 200,
     "DEBUG_MODE": false,
     "USE_API": true,
     "API_BASE_URL": "/api"
